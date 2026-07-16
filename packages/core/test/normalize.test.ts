@@ -72,7 +72,7 @@ describe('normalizePhone', () => {
 
 describe('normalizeCompanyName', () => {
   it('strips legal suffixes and punctuation', () => {
-    expect(normalizeCompanyName("Miller & Sons, LLC")).toBe('miller and sons');
+    expect(normalizeCompanyName('Miller & Sons, LLC')).toBe('miller and sons');
     expect(normalizeCompanyName('ACME GmbH')).toBe('acme');
   });
   it('keeps the name when only a suffix', () => {

@@ -10,7 +10,7 @@ describe('escapeFormulaInjection', () => {
   });
   it('neutralizes triggers hidden behind whitespace', () => {
     expect(escapeFormulaInjection('  =HYPERLINK("http://evil")')).toBe(
-      "'  =HYPERLINK(\"http://evil\")",
+      '\'  =HYPERLINK("http://evil")',
     );
     expect(escapeFormulaInjection('\t=1+1')).toBe("'\t=1+1");
   });

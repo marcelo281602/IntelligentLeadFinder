@@ -29,7 +29,9 @@ export interface EncryptedEnvelope {
 function parseMasterKey(masterKeyBase64: string): Buffer {
   const key = Buffer.from(masterKeyBase64, 'base64');
   if (key.length !== KEY_BYTES) {
-    throw new Error('APP_ENCRYPTION_KEY must decode to exactly 32 bytes (use: openssl rand -base64 32)');
+    throw new Error(
+      'APP_ENCRYPTION_KEY must decode to exactly 32 bytes (use: openssl rand -base64 32)',
+    );
   }
   return key;
 }

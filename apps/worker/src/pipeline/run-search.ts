@@ -58,7 +58,11 @@ export async function handleRunSearch(db: Db, job: Job, masterKey: string): Prom
       action: 'run.provider_started',
       entityKind: 'search_run',
       entityId: run.id,
-      details: { provider: run.provider, providerRunId: result.providerRunId, hardCapMicroUsd: hardCap },
+      details: {
+        provider: run.provider,
+        providerRunId: result.providerRunId,
+        hardCapMicroUsd: hardCap,
+      },
     });
   }
 

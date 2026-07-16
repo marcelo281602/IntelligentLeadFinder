@@ -140,8 +140,7 @@ function mapLead(lead: ApifyLead, verificationRequested: boolean): MappedContact
     // they are stored separately and never conflated.
     personalLinkedinUrl: lead.linkedinProfile ?? null,
     companyLinkedinUrl: lead.companyLinkedin ?? null,
-    personLocation:
-      [lead.city, lead.state, lead.country].filter(Boolean).join(', ') || null,
+    personLocation: [lead.city, lead.state, lead.country].filter(Boolean).join(', ') || null,
     companyName: lead.companyName ?? null,
     companyWebsite: lead.companyWebsite ?? null,
     companySize: lead.companySize ?? null,
@@ -237,7 +236,9 @@ export class ApifyGoogleMapsAdapter implements MapsProviderAdapter {
     try {
       const me = apifyUserSchema.parse(await new ApifyClient({ token: credentials.token }).getMe());
       const plan =
-        typeof me.plan === 'string' ? me.plan : ((me.plan as { id?: string } | undefined)?.id ?? '');
+        typeof me.plan === 'string'
+          ? me.plan
+          : ((me.plan as { id?: string } | undefined)?.id ?? '');
       return {
         ok: true,
         accountLabel: me.username ?? 'Apify account',

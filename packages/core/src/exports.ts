@@ -19,7 +19,12 @@ export const COMPANY_EXPORT_COLUMNS: ExportColumnDef[] = [
   { key: 'website', label: 'Website', personalData: false, defaultSelected: true },
   { key: 'company_email', label: 'Company email', personalData: false, defaultSelected: true },
   { key: 'company_phone', label: 'Company phone', personalData: false, defaultSelected: true },
-  { key: 'company_linkedin', label: 'Company LinkedIn', personalData: false, defaultSelected: true },
+  {
+    key: 'company_linkedin',
+    label: 'Company LinkedIn',
+    personalData: false,
+    defaultSelected: true,
+  },
   { key: 'full_address', label: 'Address', personalData: false, defaultSelected: true },
   { key: 'city', label: 'City', personalData: false, defaultSelected: true },
   { key: 'region', label: 'State/Region', personalData: false, defaultSelected: false },
@@ -51,9 +56,19 @@ export const CONTACT_EXPORT_COLUMNS: ExportColumnDef[] = [
     personalData: true,
     defaultSelected: true,
   },
-  { key: 'company_linkedin', label: 'Company LinkedIn', personalData: false, defaultSelected: false },
+  {
+    key: 'company_linkedin',
+    label: 'Company LinkedIn',
+    personalData: false,
+    defaultSelected: false,
+  },
   { key: 'person_location', label: 'Location', personalData: true, defaultSelected: false },
-  { key: 'match_confidence', label: 'Match confidence', personalData: false, defaultSelected: false },
+  {
+    key: 'match_confidence',
+    label: 'Match confidence',
+    personalData: false,
+    defaultSelected: false,
+  },
   { key: 'last_enriched_at', label: 'Last enriched', personalData: false, defaultSelected: false },
 ];
 

@@ -66,10 +66,10 @@ async function main(): Promise<void> {
        on conflict (organization_id, user_id) do nothing`,
       [orgId, userId],
     );
-    await db.query(
-      `update public.user_profiles set active_organization_id = $1 where id = $2`,
-      [orgId, userId],
-    );
+    await db.query(`update public.user_profiles set active_organization_id = $1 where id = $2`, [
+      orgId,
+      userId,
+    ]);
 
     // 3. Sensible default quotas for local development.
     await db.query(

@@ -25,7 +25,11 @@ const PAGE_SIZE = 100;
  * Resumable: checkpoint.offset survives worker restarts; raw-record inserts
  * are idempotent on (run_id, payload_hash).
  */
-export async function handleIngest(db: Db, job: Job, masterKey: string): Promise<'done' | 'rescheduled'> {
+export async function handleIngest(
+  db: Db,
+  job: Job,
+  masterKey: string,
+): Promise<'done' | 'rescheduled'> {
   const run = await getRun(db, job.run_id!);
   if (!run) throw new Error(`Run ${job.run_id} not found`);
 
@@ -97,8 +101,7 @@ export async function handleIngest(db: Db, job: Job, masterKey: string): Promise
     for (const [index, item] of page.items.entries()) {
       const payload = JSON.stringify(redactObject(item));
       const hash = createHash('sha256').update(payload).digest('hex');
-      const providerRecordId =
-        (item as { placeId?: string } | null)?.placeId ?? null;
+      const providerRecordId = (item as { placeId?: string } | null)?.placeId ?? null;
       await db.query(
         `insert into public.provider_raw_records
            (organization_id, run_id, provider, provider_record_id, ordinal, page_number, payload, payload_hash, retention_until)

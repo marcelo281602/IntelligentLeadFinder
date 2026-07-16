@@ -67,7 +67,11 @@ export class ApifyClient {
       throw new ProviderError('Apify rate limit reached.', 'rate_limit', true);
     }
     if (response.status >= 500) {
-      throw new ProviderError(`Apify server error (${response.status}).`, 'provider_unavailable', true);
+      throw new ProviderError(
+        `Apify server error (${response.status}).`,
+        'provider_unavailable',
+        true,
+      );
     }
 
     let json: unknown = null;

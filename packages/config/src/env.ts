@@ -20,9 +20,7 @@ const serverEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   DATABASE_URL: z.string().min(10).optional(),
-  APP_ENCRYPTION_KEY: z
-    .string()
-    .min(32, 'APP_ENCRYPTION_KEY must be a base64-encoded 32-byte key'),
+  APP_ENCRYPTION_KEY: z.string().min(32, 'APP_ENCRYPTION_KEY must be a base64-encoded 32-byte key'),
   APP_SIGNING_SECRET: z.string().min(32, 'APP_SIGNING_SECRET must be at least 32 characters'),
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
   PROVIDER_MODE: providerModeSchema.default('fixture'),

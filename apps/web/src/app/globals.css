@@ -1,0 +1,125 @@
+@import 'tailwindcss';
+
+/*
+  LeadFinder design tokens — "calm financial instrument".
+  Light cool-gray canvas, desaturated deep blue primary, cyan accent used
+  sparingly for data emphasis. All money and identifiers render in mono.
+*/
+@theme {
+  --font-display: var(--font-bricolage), ui-sans-serif, sans-serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --color-canvas: #f6f8fa;
+  --color-surface: #ffffff;
+  --color-raised: #fbfcfd;
+  --color-ink: #232a33;
+  --color-ink-soft: #4b5563;
+  --color-ink-faint: #8b95a1;
+  --color-line: #e3e8ee;
+  --color-line-strong: #cdd5de;
+
+  --color-primary: #2f4f7d;
+  --color-primary-hover: #263f64;
+  --color-primary-soft: #e8eef6;
+  --color-accent: #3ba7c4;
+  --color-accent-soft: #e5f4f8;
+  --color-accent-ink: #1d7d97;
+
+  --color-ok: #2e7d5b;
+  --color-ok-soft: #e4f2ec;
+  --color-warn: #9a6b1f;
+  --color-warn-soft: #faf1de;
+  --color-danger: #a13d3d;
+  --color-danger-soft: #f8e9e9;
+
+  --shadow-card: 0 1px 2px rgba(47, 79, 125, 0.05), 0 2px 8px rgba(47, 79, 125, 0.05);
+  --shadow-float: 0 2px 4px rgba(47, 79, 125, 0.06), 0 8px 24px rgba(47, 79, 125, 0.1);
+  --radius-card: 0.625rem;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+/* Overline section labels — the app's quiet signature */
+.overline {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+/* Money and identifiers always in mono with tabular numerals */
+.money,
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Staggered card entrance on page load */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise-in 0.45s cubic-bezier(0.21, 0.6, 0.35, 1) both;
+}
+.rise-1 {
+  animation-delay: 0.03s;
+}
+.rise-2 {
+  animation-delay: 0.08s;
+}
+.rise-3 {
+  animation-delay: 0.13s;
+}
+.rise-4 {
+  animation-delay: 0.18s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .rise-1,
+  .rise-2,
+  .rise-3,
+  .rise-4 {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus visibility — every interactive element */
+:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Header wash: one subtle radial gradient, no dark sections */
+.header-wash {
+  background:
+    radial-gradient(1000px 300px at 15% -10%, rgba(59, 167, 196, 0.07), transparent 60%),
+    radial-gradient(800px 260px at 85% -20%, rgba(47, 79, 125, 0.06), transparent 55%);
+}

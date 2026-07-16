@@ -17,7 +17,14 @@ import { auditLog } from '../ledger';
 import { log } from '../logger';
 import type { Job } from '../queue';
 import { enqueueJob, heartbeatJob } from '../queue';
-import { bumpCounts, finishStage, getRun, saveCheckpoint, transitionRun, type RunRow } from '../runs';
+import {
+  bumpCounts,
+  finishStage,
+  getRun,
+  saveCheckpoint,
+  transitionRun,
+  type RunRow,
+} from '../runs';
 
 const BATCH = 50;
 
@@ -513,7 +520,14 @@ async function upsertContact(
         `insert into public.contact_phones (organization_id, contact_id, phone, phone_e164, phone_type, source, is_primary)
          values ($1, $2, $3, $4, $5::public.phone_type, $6::public.provider_kind, true)
          on conflict (contact_id, phone) do nothing`,
-        [run.organization_id, contactId, contact.phone, phoneNorm?.e164 ?? null, contact.phoneType, run.provider],
+        [
+          run.organization_id,
+          contactId,
+          contact.phone,
+          phoneNorm?.e164 ?? null,
+          contact.phoneType,
+          run.provider,
+        ],
       );
     }
   }

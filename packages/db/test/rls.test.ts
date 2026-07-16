@@ -229,9 +229,11 @@ describe('audit log append-only', () => {
 
   it('clients cannot insert, update, or delete audit rows', async () => {
     await expect(
-      t.as(aliceId, `insert into public.audit_logs (organization_id, action) values ($1, 'forged')`, [
-        orgA,
-      ]),
+      t.as(
+        aliceId,
+        `insert into public.audit_logs (organization_id, action) values ($1, 'forged')`,
+        [orgA],
+      ),
     ).rejects.toThrow();
     const before = await t.service(`select count(*)::int as n from public.audit_logs`);
     await t.as(aliceId, `delete from public.audit_logs`);

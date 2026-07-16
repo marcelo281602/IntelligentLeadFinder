@@ -180,12 +180,8 @@ describe('fixture pipeline end to end', () => {
     const maria = contacts.find((c) => c.full_name === 'Maria Delgado')!;
     expect(maria.work_email).toBe('maria.delgado@brightpipe.example');
     expect(maria.work_email_status).toBe('verified');
-    expect(maria.personal_linkedin_url).toBe(
-      'https://www.linkedin.com/in/maria-delgado-fixture',
-    );
-    expect(maria.company_linkedin_url).toBe(
-      'https://www.linkedin.com/company/brightpipe-plumbing',
-    );
+    expect(maria.personal_linkedin_url).toBe('https://www.linkedin.com/in/maria-delgado-fixture');
+    expect(maria.company_linkedin_url).toBe('https://www.linkedin.com/company/brightpipe-plumbing');
 
     const james = contacts.find((c) => c.full_name === 'James Okafor')!;
     expect(james.work_email_status).toBe('catch_all');
@@ -226,15 +222,25 @@ describe('fixture pipeline end to end', () => {
       'provider_cost',
     ]);
     const ledger = (
-      await t.service(`select actual_micro_usd::int as actual from public.cost_ledger where run_id = $1`, [runId])
+      await t.service(
+        `select actual_micro_usd::int as actual from public.cost_ledger where run_id = $1`,
+        [runId],
+      )
     ).rows[0]!;
     expect(ledger.actual).toBe(0); // fixture provider is free
 
     // Re-running reconcile must not duplicate ledger rows.
-    await enqueueJob(db, { kind: 'reconcile_costs', orgId, runId, idempotencyKey: `reconcile2:${runId}` });
+    await enqueueJob(db, {
+      kind: 'reconcile_costs',
+      orgId,
+      runId,
+      idempotencyKey: `reconcile2:${runId}`,
+    });
     await processQueue();
     const after = (
-      await t.service(`select count(*)::int as n from public.usage_events where run_id = $1`, [runId])
+      await t.service(`select count(*)::int as n from public.usage_events where run_id = $1`, [
+        runId,
+      ])
     ).rows[0]!;
     expect(after.n).toBe(3);
   });
@@ -244,13 +250,20 @@ describe('fixture pipeline end to end', () => {
       await t.service(`select action from public.audit_logs where organization_id = $1`, [orgId])
     ).rows.map((r) => r.action);
     expect(actions).toEqual(
-      expect.arrayContaining(['run.provider_started', 'run.ingested', 'run.normalized', 'run.reconciled']),
+      expect.arrayContaining([
+        'run.provider_started',
+        'run.ingested',
+        'run.normalized',
+        'run.reconciled',
+      ]),
     );
   });
 
   it('provenance rows exist for merged duplicates too', async () => {
     const sources = (
-      await t.service(`select count(*)::int as n from public.company_sources where run_id = $1`, [runId])
+      await t.service(`select count(*)::int as n from public.company_sources where run_id = $1`, [
+        runId,
+      ])
     ).rows[0]!;
     // 9 accepted + 2 merged duplicates, minus 1: the exact placeId duplicate is
     // the same provider record re-scraped in the same run, so provenance is

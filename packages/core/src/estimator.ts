@@ -192,8 +192,12 @@ export function validateHardCap(params: {
   orgPerRunCapMicroUsd: MicroUsd | null;
   orgRemainingMonthlyBudgetMicroUsd: MicroUsd | null;
 }): { ok: true; capMicroUsd: MicroUsd } | { ok: false; reason: string } {
-  const { requestedCapMicroUsd, estimate, orgPerRunCapMicroUsd, orgRemainingMonthlyBudgetMicroUsd } =
-    params;
+  const {
+    requestedCapMicroUsd,
+    estimate,
+    orgPerRunCapMicroUsd,
+    orgRemainingMonthlyBudgetMicroUsd,
+  } = params;
   if (!Number.isInteger(requestedCapMicroUsd) || requestedCapMicroUsd <= 0) {
     return { ok: false, reason: 'Cap must be a positive amount.' };
   }

@@ -1,4 +1,10 @@
-import type { EmailStatus, MicroUsd, PhoneType, ProviderKind, SearchConfig } from '@leadfinder/core';
+import type {
+  EmailStatus,
+  MicroUsd,
+  PhoneType,
+  ProviderKind,
+  SearchConfig,
+} from '@leadfinder/core';
 
 /**
  * Provider adapter contracts. The rest of the platform only talks to these
@@ -35,12 +41,7 @@ export interface StartRunResult {
   datasetId?: string;
 }
 
-export type ProviderRunState =
-  | 'running'
-  | 'succeeded'
-  | 'failed'
-  | 'aborted'
-  | 'timed_out';
+export type ProviderRunState = 'running' | 'succeeded' | 'failed' | 'aborted' | 'timed_out';
 
 export interface ProviderRunStatus {
   state: ProviderRunState;
@@ -146,10 +147,7 @@ export interface MapsProviderAdapter {
   capabilities(): CapabilityManifest;
   testConnection(credentials: ProviderCredentials): Promise<ConnectionTestResult>;
   startRun(params: StartRunParams): Promise<StartRunResult>;
-  getRunStatus(
-    credentials: ProviderCredentials,
-    providerRunId: string,
-  ): Promise<ProviderRunStatus>;
+  getRunStatus(credentials: ProviderCredentials, providerRunId: string): Promise<ProviderRunStatus>;
   abortRun(credentials: ProviderCredentials, providerRunId: string): Promise<void>;
   fetchDatasetPage(
     credentials: ProviderCredentials,

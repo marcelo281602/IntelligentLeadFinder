@@ -59,7 +59,11 @@ describe('signed tokens', () => {
   const secret = 'test-signing-secret-with-enough-length';
 
   it('round-trips and enforces purpose', () => {
-    const token = createSignedToken({ purpose: 'export-download', sub: 'e1', org: 'o1' }, 60, secret);
+    const token = createSignedToken(
+      { purpose: 'export-download', sub: 'e1', org: 'o1' },
+      60,
+      secret,
+    );
     const good = verifySignedToken(token, 'export-download', secret);
     expect(good.ok).toBe(true);
     const wrong = verifySignedToken(token, 'apify-callback', secret);
@@ -95,7 +99,11 @@ describe('signed tokens', () => {
 describe('redaction', () => {
   it('masks sensitive keys deeply', () => {
     const input = {
-      run: { id: 'r1', apiToken: 'apify_api_abc123def456', nested: { Authorization: 'Bearer xyz' } },
+      run: {
+        id: 'r1',
+        apiToken: 'apify_api_abc123def456',
+        nested: { Authorization: 'Bearer xyz' },
+      },
       safe: 'value',
     };
     const out = redactObject(input);

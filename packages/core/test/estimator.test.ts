@@ -63,7 +63,9 @@ describe('estimateRunCost', () => {
   });
 
   it('rejects non-positive maxResults', () => {
-    expect(() => estimateRunCost({ ...baseInput, maxResults: 0 }, apifyGoogleMapsRateCard('starter'))).toThrow();
+    expect(() =>
+      estimateRunCost({ ...baseInput, maxResults: 0 }, apifyGoogleMapsRateCard('starter')),
+    ).toThrow();
   });
 
   it('free plan business leads are dramatically more expensive than starter', () => {

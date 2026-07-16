@@ -105,7 +105,11 @@ export function backoffMs(attempts: number): number {
   return base + jitter;
 }
 
-export async function failJob(db: Db, job: Job, error: unknown): Promise<'retrying' | 'dead_letter'> {
+export async function failJob(
+  db: Db,
+  job: Job,
+  error: unknown,
+): Promise<'retrying' | 'dead_letter'> {
   const summary = errorSummary(error);
   if (job.attempts >= job.max_attempts) {
     await db.query(

@@ -1,12 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import ExcelJS from 'exceljs';
-import {
-  columnsForKind,
-  escapeFormulaInjection,
-  toCsv,
-  type CsvColumn,
-} from '@leadfinder/core';
+import { columnsForKind, escapeFormulaInjection, toCsv, type CsvColumn } from '@leadfinder/core';
 import type { Db } from '../db';
 import { one } from '../db';
 import { auditLog, notify, recordUsage } from '../ledger';
@@ -84,10 +79,7 @@ export async function handleGenerateExport(db: Db, job: Job, storageDir: string)
   await db.query(`update public.exports set status = 'generating' where id = $1`, [exp.id]);
 
   const kind = exp.config.kind;
-  const validKeys = new Set([
-    ...columnsForKind(kind).map((c) => c.key),
-    'src_is_fixture',
-  ]);
+  const validKeys = new Set([...columnsForKind(kind).map((c) => c.key), 'src_is_fixture']);
   const sqlMap = kind === 'companies' ? COMPANY_SQL : CONTACT_SQL;
   const columns = exp.config.columns.filter((c) => validKeys.has(c.key) && sqlMap[c.key]);
   if (exp.include_source_metadata && !columns.some((c) => c.key === 'src_is_fixture')) {
