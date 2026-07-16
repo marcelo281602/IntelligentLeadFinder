@@ -1,0 +1,155 @@
+import { usdToMicro, type MicroUsd, type ProviderKind } from './types';
+
+/**
+ * Versioned provider rate cards (Module 4).
+ *
+ * Prices below were verified from public provider pages on 2026-07-16 and are
+ * seeded into the provider_rate_cards table. They are planning estimates, not
+ * permanent constants: production reads rate cards from the database where
+ * admins can publish new versions; historical versions are retained so old
+ * run estimates stay explainable.
+ */
+
+export type ApifyPlanTier = 'free' | 'starter' | 'scale' | 'business';
+
+export const APIFY_EVENT_KEYS = [
+  'place_scraped',
+  'filter_applied',
+  'place_details',
+  'company_contacts',
+  'business_lead',
+  'email_verification',
+  'social_profile',
+  'review_scraped',
+  'image_scraped',
+] as const;
+export type ApifyEventKey = (typeof APIFY_EVENT_KEYS)[number];
+
+export interface RateCard {
+  provider: ProviderKind;
+  /** e.g. Apify Actor id the card applies to. */
+  scope: string;
+  planTier: string;
+  currency: 'USD';
+  version: number;
+  lastVerifiedAt: string; // ISO date
+  sourceUrl: string;
+  /** Per-single-unit price in micro-USD (spec prices are per 1,000 units). */
+  events: Record<string, MicroUsd>;
+  /** Estimator assumptions bundled with the card so estimates are reproducible. */
+  assumptions: EstimatorAssumptions;
+}
+
+export interface EstimatorAssumptions {
+  /** Fraction of requested places actually found: low/expected/high. */
+  placeFillRate: { low: number; expected: number; high: number };
+  /** Fraction of companies yielding a successfully extracted business lead. */
+  leadSuccessRate: { low: number; expected: number; high: number };
+  /** Fraction of found emails producing a decisive verification charge. */
+  verificationDecisiveRate: { low: number; expected: number; high: number };
+}
+
+const DEFAULT_ASSUMPTIONS: EstimatorAssumptions = {
+  placeFillRate: { low: 0.5, expected: 0.85, high: 1.0 },
+  leadSuccessRate: { low: 0.3, expected: 0.6, high: 1.0 },
+  verificationDecisiveRate: { low: 0.3, expected: 0.6, high: 1.0 },
+};
+
+/** Per-1,000-unit USD prices from https://apify.com/compass/crawler-google-places/pricing (verified 2026-07-16). */
+const APIFY_GMAPS_PER_1000_USD: Record<ApifyPlanTier, Record<ApifyEventKey, number>> = {
+  free: {
+    place_scraped: 4.0,
+    filter_applied: 1.0,
+    place_details: 2.0,
+    company_contacts: 2.0,
+    business_lead: 100.0,
+    email_verification: 100.0,
+    social_profile: 100.0,
+    review_scraped: 0.5,
+    image_scraped: 0.5,
+  },
+  starter: {
+    place_scraped: 3.0,
+    filter_applied: 1.0,
+    place_details: 2.0,
+    company_contacts: 2.0,
+    business_lead: 5.0,
+    email_verification: 4.0,
+    social_profile: 8.0,
+    review_scraped: 0.5,
+    image_scraped: 0.5,
+  },
+  scale: {
+    place_scraped: 2.0,
+    filter_applied: 0.75,
+    place_details: 1.5,
+    company_contacts: 1.5,
+    business_lead: 5.0,
+    email_verification: 3.0,
+    social_profile: 7.0,
+    review_scraped: 0.37,
+    image_scraped: 0.37,
+  },
+  business: {
+    place_scraped: 1.5,
+    filter_applied: 0.53,
+    place_details: 1.05,
+    company_contacts: 1.05,
+    business_lead: 4.0,
+    email_verification: 2.0,
+    social_profile: 6.0,
+    review_scraped: 0.26,
+    image_scraped: 0.26,
+  },
+};
+
+export const DEFAULT_APIFY_ACTOR_ID = 'compass/crawler-google-places';
+
+export function apifyGoogleMapsRateCard(planTier: ApifyPlanTier): RateCard {
+  const per1000 = APIFY_GMAPS_PER_1000_USD[planTier];
+  const events: Record<string, MicroUsd> = {};
+  for (const [key, usdPer1000] of Object.entries(per1000)) {
+    events[key] = usdToMicro(usdPer1000 / 1000);
+  }
+  return {
+    provider: 'apify',
+    scope: DEFAULT_APIFY_ACTOR_ID,
+    planTier,
+    currency: 'USD',
+    version: 1,
+    lastVerifiedAt: '2026-07-16',
+    sourceUrl: 'https://apify.com/compass/crawler-google-places/pricing',
+    events,
+    assumptions: DEFAULT_ASSUMPTIONS,
+  };
+}
+
+/** Outscraper base pricing (verified 2026-07-16): $3/1,000 after first free 500/mo. */
+export function outscraperMapsRateCard(): RateCard {
+  return {
+    provider: 'outscraper',
+    scope: 'google-maps',
+    planTier: 'pay_as_you_go',
+    currency: 'USD',
+    version: 1,
+    lastVerifiedAt: '2026-07-16',
+    sourceUrl: 'https://outscraper.com/google-maps-scraper/',
+    events: { place_scraped: usdToMicro(3 / 1000) },
+    assumptions: DEFAULT_ASSUMPTIONS,
+  };
+}
+
+/** Fixture provider is free — used for deterministic local preview and tests. */
+export function fixtureRateCard(): RateCard {
+  return {
+    provider: 'fixture',
+    scope: 'fixture-google-maps',
+    planTier: 'free',
+    currency: 'USD',
+    version: 1,
+    lastVerifiedAt: '2026-07-16',
+    sourceUrl: 'internal://fixture',
+    events: Object.fromEntries(APIFY_EVENT_KEYS.map((k) => [k, 0])),
+    assumptions: DEFAULT_ASSUMPTIONS,
+  };
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@leadfinder/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@leadfinder/config": "*",
+    "@leadfinder/core": "*",
+    "@leadfinder/db": "*",
+    "@leadfinder/providers": "*",
+    "@leadfinder/security": "*",
+    "exceljs": "4.4.0",
+    "pg": "8.22.0",
+    "tsx": "4.23.1",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.4",
+    "@types/node": "24.13.3",
+    "@types/pg": "8.20.0",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

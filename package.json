@@ -1,0 +1,31 @@
+{
+  "name": "leadfinder",
+  "private": true,
+  "version": "0.1.0",
+  "description": "LeadFinder — multi-tenant lead intelligence SaaS platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace apps/web",
+    "dev:worker": "npm run dev --workspace apps/worker",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . && npm run lint --workspace @leadfinder/web",
+    "test": "npm run test --workspaces --if-present",
+    "test:db": "npm run test --workspace packages/db",
+    "db:migrate": "npm run migrate --workspace packages/db",
+    "db:seed": "npm run seed --workspace packages/db",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write ."
+  },
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "prettier": "3.6.2",
+    "typescript-eslint": "8.64.0"
+  }
+}

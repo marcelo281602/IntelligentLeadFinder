@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Builds
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# Environment — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Local data
+.local-storage/
+*.local.db
+supabase/.temp/
+supabase/.branches/
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Temporary screenshots
+temporary screenshots/
