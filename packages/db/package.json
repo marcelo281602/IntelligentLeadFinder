@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "migrate": "tsx scripts/migrate.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "connect:apify": "tsx scripts/connect-apify.ts"
   },
   "dependencies": {
     "@leadfinder/core": "*",
