@@ -49,8 +49,12 @@ Update this file whenever a durable decision is made.
 
 1. ~~Hosted Supabase project~~ **RESOLVED 2026-07-17**: project `dyblidzhtgisnjjgwahd` connected; 7 migrations applied; demo workspace seeded; live fixture run completed through the real worker (9/2/3/4 counts verified). Credentials live only in gitignored `.env`.
 2. ~~Apify token~~ **PARTIALLY RESOLVED 2026-07-17**: token tested (account `expert_puppet`, FREE plan) and stored envelope-encrypted via `npm run connect:apify`. The ≤10-record **paid smoke run still awaits explicit user approval**. Note: FREE plan makes Business Leads enrichment ~20× pricier — first smoke should skip enrichment (~$0.04 for 10 places).
-3. **Supabase publishable key missing** (`sb_publishable_…`, Dashboard → Settings → API keys) — required for browser sign-in; server-side flows all work without it.
+3. ~~Publishable/anon key~~ **RESOLVED 2026-07-17**: legacy anon key configured; full browser E2E passed locally AND in production.
+4. ~~GitHub push~~ **RESOLVED 2026-07-17**: pushed to marcelo281602/IntelligentLeadFinder via repo-scoped PAT (not persisted).
+5. **DEPLOYED 2026-07-17**: web live at https://intelligent-lead-finder.vercel.app (Vercel project intelligent-lead-finder, team adverts-ai, rootDirectory apps/web, 8 prod env vars). Health check green; production sign-in + dashboard verified. CAVEAT: the worker currently runs on the dev Mac against the same Supabase — runs only progress while it's up. Proper worker host (Railway/Render/Fly) is the next infra step.
+6. **Supabase Auth URLs**: add https://intelligent-lead-finder.vercel.app as Site URL + /auth/callback redirect in the Supabase dashboard for email verification/reset flows (password sign-in already works).
+7. (superseded) **Supabase publishable key missing** (`sb_publishable_…`, Dashboard → Settings → API keys) — required for browser sign-in; server-side flows all work without it.
 4. **GitHub push blocked**: keychain credential is account `Eriin2816`, which lacks write access to `marcelo281602/IntelligentLeadFinder` (remote `origin` already configured). Fix: add Eriin2816 as collaborator OR supply a repo-scoped PAT for marcelo281602.
 5. **Apollo commercial-use approval** — integration stays off without documented terms.
 6. **Deployment approval** — Vercel project, worker host, production env vars.
-7. **Security follow-up**: DB password + sb_secret key were shared in chat — rotate both in the Supabase dashboard once setup is confirmed; change the demo user password.
+8. **Security follow-up**: DB password, sb_secret key, Apify token, and the GitHub PAT were shared in chat — rotate all four after setup settles; change the demo user password (demo-password-change-me).

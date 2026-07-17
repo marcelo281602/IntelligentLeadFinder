@@ -31,3 +31,4 @@ test-results/
 
 # Temporary screenshots
 temporary screenshots/
+.vercel/
