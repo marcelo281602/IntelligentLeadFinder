@@ -10,6 +10,7 @@ import { handleNormalize } from './pipeline/normalize';
 import { handleReconcile } from './pipeline/reconcile';
 import { handleRetentionSweep } from './pipeline/retention';
 import { handleRunSearch } from './pipeline/run-search';
+import { handleSyncDestination } from './pipeline/sync-destinations';
 
 /**
  * LeadFinder worker: durable job processing over Postgres.
@@ -42,6 +43,8 @@ async function dispatch(job: Job): Promise<void | 'done' | 'rescheduled'> {
       return handleReconcile(db, job, env.APP_ENCRYPTION_KEY);
     case 'generate_export':
       return handleGenerateExport(db, job, env.EXPORT_STORAGE_DIR);
+    case 'sync_destination':
+      return handleSyncDestination(db, job, env.APP_ENCRYPTION_KEY);
     case 'retention_sweep':
       return handleRetentionSweep(db);
     case 'dedupe_run':

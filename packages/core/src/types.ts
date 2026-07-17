@@ -72,10 +72,22 @@ export const JOB_KINDS = [
   'enrich_run',
   'reconcile_costs',
   'generate_export',
+  'sync_destination',
   'test_connection',
   'retention_sweep',
 ] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
+
+export const DESTINATION_KINDS = ['google_sheets', 'webhook', 'n8n', 'make', 'zapier'] as const;
+export type DestinationKind = (typeof DESTINATION_KINDS)[number];
+
+export const DESTINATION_LABELS: Record<DestinationKind, string> = {
+  google_sheets: 'Google Sheets',
+  webhook: 'Webhook',
+  n8n: 'n8n',
+  make: 'Make',
+  zapier: 'Zapier',
+};
 
 export const JOB_STATUSES = [
   'pending',

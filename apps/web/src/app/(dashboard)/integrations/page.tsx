@@ -14,31 +14,55 @@ import { requireOrg } from '@/lib/auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { formatDateTime } from '@/lib/format';
 import { Badge, Button, Card, CardHeader, Field, Input, Select } from '@/components/ui';
+import { DestinationsSection, type DestinationRow } from '@/components/destinations-section';
 
 export const metadata = { title: 'Integrations' };
 
 export default async function IntegrationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; connected?: string; tested?: string; rotated?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    connected?: string;
+    tested?: string;
+    rotated?: string;
+    derror?: string;
+    dsecret?: string;
+    dname?: string;
+    dtested?: string;
+    dsync?: string;
+  }>;
 }) {
   const ctx = await requireOrg();
   const params = await searchParams;
   const canManage = hasPermission(ctx.role, 'integrations:manage');
+  const canDestinations = hasPermission(ctx.role, 'destinations:sync', ctx.overrides);
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: connections }, { data: flags }, { data: approvals }] = await Promise.all([
-    supabase
-      .from('integration_connections')
-      .select(
-        'id, provider, label, status, config, secret_fingerprint, last_test_at, last_test_ok, last_error, last_used_at, created_at',
-      )
-      .eq('organization_id', ctx.orgId)
-      .is('deleted_at', null)
-      .order('created_at'),
-    supabase.from('feature_flags').select('key, enabled').is('organization_id', null),
-    supabase.from('commercial_use_approvals').select('provider, approved').eq('provider', 'apollo'),
-  ]);
+  const [{ data: connections }, { data: flags }, { data: approvals }, { data: destinations }] =
+    await Promise.all([
+      supabase
+        .from('integration_connections')
+        .select(
+          'id, provider, label, status, config, secret_fingerprint, last_test_at, last_test_ok, last_error, last_used_at, created_at',
+        )
+        .eq('organization_id', ctx.orgId)
+        .is('deleted_at', null)
+        .order('created_at'),
+      supabase.from('feature_flags').select('key, enabled').is('organization_id', null),
+      supabase
+        .from('commercial_use_approvals')
+        .select('provider, approved')
+        .eq('provider', 'apollo'),
+      supabase
+        .from('destinations')
+        .select(
+          'id, kind, name, endpoint_url, status, auto_sync, include_contacts, synced_count, last_sync_at, last_error, secret_fingerprint',
+        )
+        .eq('organization_id', ctx.orgId)
+        .is('deleted_at', null)
+        .order('created_at'),
+    ]);
 
   const flagEnabled = (key: string) => (flags ?? []).find((f) => f.key === key)?.enabled ?? false;
   const apolloApproved = (approvals ?? []).some((a) => a.approved);
@@ -100,6 +124,36 @@ export default async function IntegrationsPage({
         >
           Connection test {params.tested === 'ok' ? 'passed' : 'failed'}.
         </p>
+      ) : null}
+      {params.derror ? (
+        <p role="alert" className="rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">
+          {params.derror}
+        </p>
+      ) : null}
+      {params.dtested ? (
+        <p
+          className={`rounded-md px-4 py-3 text-sm ${params.dtested === 'ok' ? 'bg-ok-soft text-ok' : 'bg-danger-soft text-danger'}`}
+        >
+          Destination test{' '}
+          {params.dtested === 'ok' ? 'passed — check your sheet for a sample row' : 'failed'}.
+        </p>
+      ) : null}
+      {params.dsync ? (
+        <p className="rounded-md bg-ok-soft px-4 py-3 text-sm text-ok">
+          Sync queued — new leads will appear in your destination shortly.
+        </p>
+      ) : null}
+      {params.dsecret ? (
+        <div className="rounded-md bg-warn-soft px-4 py-3 text-sm text-warn">
+          <p className="font-medium">
+            Destination “{params.dname}” saved. Your sync secret (shown once):
+          </p>
+          <code className="mono mt-1 block break-all text-xs">{params.dsecret}</code>
+          <p className="mt-1 text-xs">
+            It is already embedded in the Apps Script you copied. Keep it private — it authorizes
+            writes to your sheet.
+          </p>
+        </div>
       ) : null}
 
       <p className="overline">Data sources</p>
@@ -292,6 +346,11 @@ export default async function IntegrationsPage({
           provider results.
         </p>
       </Card>
+
+      <DestinationsSection
+        destinations={(destinations ?? []) as DestinationRow[]}
+        canManage={canDestinations}
+      />
 
       <p className="overline">Planned providers</p>
       <div className="grid gap-4 md:grid-cols-3">

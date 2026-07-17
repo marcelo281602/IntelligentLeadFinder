@@ -4,6 +4,7 @@ import { FixtureMapsAdapter } from './fixture/adapter';
 import { ProviderError, type MapsProviderAdapter } from './types';
 
 export * from './types';
+export { deliverToDestination, type DeliverResult } from './destinations';
 export {
   ApifyGoogleMapsAdapter,
   buildActorInput,

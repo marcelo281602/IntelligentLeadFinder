@@ -71,3 +71,14 @@ Update this file whenever a durable decision is made.
 | PWA shipped: manifest route, generated PNG icons (scripted, zero-dep), pass-through service worker (no caching of authed data), beforeinstallprompt install button. Middleware allows manifest/sw/icons. |
 | Apify "pagination" reality: the actor cannot resume at an offset across runs — each run rescrapes from the top of search results and bills every scraped place again. Cost-safe daily patterns: (a) segment by location (different city/zip per day), (b) one larger run instead of N small ones, (c) dedupe already guarantees no duplicate records in-app. A "continuation runs" helper is roadmapped, not yet built. |
 | Outscraper/Prospeo/Apollo full adapters: NEXT work block (docs-verified endpoints, contract tests, connect/test UI; Apollo stays commercially gated regardless). |
+
+## 2026-07-18 (destinations + client deliverables)
+
+| Decision |
+| --- |
+| Migration 0010: `destinations` (standing sync targets: google_sheets/webhook/n8n/make/zapier, encrypted shared secret, auto_sync flag) + `destination_deliveries` (unique per destination+entity → a lead can never be appended twice) + `sync_destination` job kind. |
+| Google Sheets integration = client-deployed Apps Script web app (no OAuth scopes, no Google Cloud project needed): LeadFinder POSTs `{columns, rows, secret}` signed with `X-LeadFinder-Signature` (HMAC-SHA256); the script verifies the shared secret and appends rows. Secret is generated client-side, embedded in the copied script, encrypted at rest server-side. |
+| Auto-sync trigger lives at end of reconcile: every completed run enqueues one `sync_destination` job per auto_sync destination (idempotency `dest:<destId>:<runId>`). Manual "Sync now" pushes all not-yet-delivered leads. Sheets cells are formula-injection-escaped; raw webhooks get raw values. |
+| Delivery SSRF guard: HTTPS only, loopback/private ranges refused, redirects refused, 20s timeout. fetch failures surface `.cause.code` (ENOTFOUND etc.), not just "TypeError". |
+| Live E2E verified on hosted Supabase: 9 fixture leads → postman-echo (httpbin.org DNS is blocked in this sandbox), deliveries=9, re-sync appended 0 (idempotent). Test destination soft-deleted after. |
+| Client deliverables in `deliverables/`: LeadFinder-Client-Handoff.pdf (4pp: access, workflow, Apify BYO-key, cost controls, Sheets setup, trial) and LeadFinder-vs-Apify-Why-It-Wins.pdf (3pp: engine-vs-car positioning, side-by-side table, 5 value props). Branded reportlab, entity-render verified. |

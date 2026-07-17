@@ -4,7 +4,7 @@ import type { ProviderKind } from '@leadfinder/core';
 import type { Db } from '../db';
 import { auditLog, notify, recordUsage } from '../ledger';
 import { log } from '../logger';
-import type { Job } from '../queue';
+import { enqueueJob, type Job } from '../queue';
 import { finishStage, getRun, transitionRun } from '../runs';
 import { loadCredentials } from '../secrets';
 
@@ -124,4 +124,24 @@ export async function handleReconcile(db: Db, job: Job, masterKey: string): Prom
     entityId: run.id,
     details: { estimated, actualMicroUsd, variance, partial },
   });
+
+  // Auto-sync: push this run's new leads to every auto-sync destination so the
+  // client's Google Sheet / webhook stays current without a manual export.
+  if (run.accepted_count > 0) {
+    const { rows: destinations } = await db.query(
+      `select id from public.destinations
+       where organization_id = $1 and auto_sync = true and status <> 'disconnected' and deleted_at is null`,
+      [run.organization_id],
+    );
+    for (const destination of destinations) {
+      await enqueueJob(db, {
+        kind: 'sync_destination',
+        orgId: run.organization_id,
+        runId: run.id,
+        idempotencyKey: `dest:${destination.id as string}:${run.id}`,
+        payload: { destinationId: destination.id, runId: run.id },
+        runAfterMs: run.is_fixture ? 200 : 2000,
+      });
+    }
+  }
 }

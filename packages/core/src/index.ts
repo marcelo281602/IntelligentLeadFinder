@@ -8,3 +8,4 @@ export * from './dedupe';
 export * from './csv';
 export * from './search-config';
 export * from './exports';
+export * from './destinations';
