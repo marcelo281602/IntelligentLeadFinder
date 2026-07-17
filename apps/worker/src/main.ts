@@ -28,13 +28,14 @@ const db: Db = pool;
 const workerId = `worker-${randomUUID().slice(0, 8)}`;
 let shuttingDown = false;
 
-async function dispatch(job: Job): Promise<void> {
+async function dispatch(job: Job): Promise<void | 'done' | 'rescheduled'> {
   switch (job.kind) {
     case 'run_search':
       return handleRunSearch(db, job, env.APP_ENCRYPTION_KEY);
     case 'ingest_dataset':
-      await handleIngest(db, job, env.APP_ENCRYPTION_KEY);
-      return;
+      // The return value matters: 'rescheduled' means the poll job was reset
+      // to pending with a delay and must NOT be marked succeeded.
+      return handleIngest(db, job, env.APP_ENCRYPTION_KEY);
     case 'normalize_run':
       return handleNormalize(db, job);
     case 'reconcile_costs':

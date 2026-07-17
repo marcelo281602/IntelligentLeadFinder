@@ -246,8 +246,8 @@ export function SearchBuilder({
               <span className="mt-0.5 block text-base font-semibold">Business filters</span>
               <span className="text-xs text-ink-faint">
                 Star rating, website and closed-place filters are billed by the provider (
-                {config ? countBillableFilters(config.filters) : 0} active). Phone, email
-                and review-count filters are applied for free after collection.
+                {config ? countBillableFilters(config.filters) : 0} active). Phone, email and
+                review-count filters are applied for free after collection.
               </span>
             </summary>
             <div className="grid gap-4 border-t border-line p-5 sm:grid-cols-2">
@@ -264,7 +264,11 @@ export function SearchBuilder({
                   <option value="4.5">4.5+</option>
                 </Select>
               </Field>
-              <Field label="Include categories" htmlFor="sb-cats" hint="Comma-separated">
+              <Field
+                label="Include categories"
+                htmlFor="sb-cats"
+                hint="Comma-separated · applied free after collection"
+              >
                 <Input
                   id="sb-cats"
                   value={includeCategories}
@@ -309,10 +313,17 @@ export function SearchBuilder({
                     type="checkbox"
                     className={checkbox}
                     checked={requireEmail}
-                    onChange={(e) => setRequireEmail(e.target.checked)}
+                    onChange={(e) => {
+                      setRequireEmail(e.target.checked);
+                      // Emails only exist when company-contact enrichment runs —
+                      // requiring them without it would reject every result.
+                      if (e.target.checked) setCompanyContacts(true);
+                    }}
                   />
                   Has company email{' '}
-                  <span className="text-xs text-ink-faint">(free post-filter)</span>
+                  <span className="text-xs text-ink-faint">
+                    (enables contact enrichment — emails come from websites)
+                  </span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -329,7 +340,10 @@ export function SearchBuilder({
                     type="checkbox"
                     className={checkbox}
                     checked={companyContacts}
-                    onChange={(e) => setCompanyContacts(e.target.checked)}
+                    onChange={(e) => {
+                      setCompanyContacts(e.target.checked);
+                      if (!e.target.checked) setRequireEmail(false);
+                    }}
                   />
                   Company contact enrichment
                   <span className="text-xs text-ink-faint">

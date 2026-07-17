@@ -45,6 +45,36 @@ export async function signUp(formData: FormData): Promise<void> {
   }
   enforceRateLimit(`signup:${parsed.data.email}`, 5, 60_000);
   const supabase = await createSupabaseServerClient();
+
+  // Frictionless default: accounts are created pre-confirmed and signed in
+  // immediately — no verification email between "create workspace" and using
+  // the product. Set AUTH_EMAIL_VERIFICATION=required to restore the
+  // verification-email flow (kept below; Resend integration planned).
+  if (process.env.AUTH_EMAIL_VERIFICATION !== 'required') {
+    const { createServiceClient } = await import('@/lib/supabase/service');
+    const service = createServiceClient();
+    const created = await service.auth.admin.createUser({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      email_confirm: true,
+      user_metadata: { full_name: parsed.data.fullName },
+    });
+    if (created.error) {
+      const message = /already/i.test(created.error.message)
+        ? 'An account with that email already exists — sign in instead.'
+        : created.error.message;
+      redirect(`/sign-up?error=${encodeURIComponent(message)}`);
+    }
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
+    if (signInError) {
+      redirect(`/sign-in?error=${encodeURIComponent('Account created — please sign in.')}`);
+    }
+    redirect('/onboarding');
+  }
+
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,

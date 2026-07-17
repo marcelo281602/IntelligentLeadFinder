@@ -178,6 +178,26 @@ export async function confirmRun(formData: FormData): Promise<void> {
     redirect(`${back}?error=${encodeURIComponent('This run is not awaiting confirmation.')}`);
   }
 
+  // Trial/plan gate: expired trials and suspended workspaces cannot start
+  // paid provider runs. Fixture (test) runs stay available.
+  if (!run.is_fixture) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('plan, trial_ends_at')
+      .eq('id', ctx.orgId)
+      .maybeSingle();
+    if (org?.plan === 'suspended') {
+      redirect(
+        `${back}?error=${encodeURIComponent('This workspace is suspended — contact support.')}`,
+      );
+    }
+    if (org?.plan === 'trial' && new Date(org.trial_ends_at as string) < new Date()) {
+      redirect(
+        `${back}?error=${encodeURIComponent('Your 14-day trial has ended. Paid runs are paused — contact support to activate the workspace. Test (fixture) runs still work.')}`,
+      );
+    }
+  }
+
   const requestedCap = usdToMicro(capUsd.data);
   const budget = await getBudgetStatus(ctx.orgId);
   const estimate = run.estimate as {

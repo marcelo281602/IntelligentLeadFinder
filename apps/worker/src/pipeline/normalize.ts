@@ -162,13 +162,22 @@ function passesPostFilters(company: MappedCompany, config: SearchConfig): boolea
     const haystack = `${company.canonicalName} ${company.primaryCategory ?? ''}`.toLowerCase();
     if (filters.excludeKeywords.some((kw) => haystack.includes(kw.toLowerCase()))) return false;
   }
+  const categories = [company.primaryCategory, ...company.categories]
+    .filter((c): c is string => Boolean(c))
+    .map((c) => c.toLowerCase());
   if (filters.excludeCategories.length > 0) {
-    const categories = new Set(
-      [company.primaryCategory, ...company.categories]
-        .filter((c): c is string => Boolean(c))
-        .map((c) => c.toLowerCase()),
+    const exact = new Set(categories);
+    if (filters.excludeCategories.some((c) => exact.has(c.toLowerCase()))) return false;
+  }
+  // Include-categories is a free local filter (never sent to the provider —
+  // the actor's category field has a restricted vocabulary). Substring match
+  // keeps "Plumber" matching "Emergency plumber".
+  if (filters.includeCategories.length > 0) {
+    const wanted = filters.includeCategories.map((c) => c.toLowerCase());
+    const matches = categories.some((category) =>
+      wanted.some((w) => category.includes(w) || w.includes(category)),
     );
-    if (filters.excludeCategories.some((c) => categories.has(c.toLowerCase()))) return false;
+    if (!matches) return false;
   }
   return true;
 }

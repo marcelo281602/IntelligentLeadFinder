@@ -79,17 +79,18 @@ export type SearchConfig = z.infer<typeof searchConfigSchema>;
  * Count provider-billable filters for the estimator. Only filters the
  * maintained Google Maps actor applies provider-side bill per scraped place
  * (verified against the actor input schema on 2026-07-16): minimum stars
- * (placeMinimumStars), website presence (website), category constraints
- * (categoryFilterWords), and closed-place exclusion (skipClosedPlaces).
+ * (placeMinimumStars), website presence (website), and closed-place
+ * exclusion (skipClosedPlaces).
  *
- * requirePhone / requireCompanyEmail / review-count bounds are applied
- * locally after ingestion and are free.
+ * Category include/exclude, requirePhone, requireCompanyEmail, and
+ * review-count bounds are applied locally after ingestion and are free
+ * (the actor's category field only accepts its fixed vocabulary and rejects
+ * the whole run otherwise, so we never send it).
  */
 export function countBillableFilters(filters: BusinessFilters): number {
   let count = 0;
   if (filters.minRating !== undefined) count += 1;
   if (filters.requireWebsite) count += 1;
-  if (filters.includeCategories.length > 0) count += 1;
   if (filters.excludeTemporarilyClosed && filters.excludePermanentlyClosed) count += 1;
   return count;
 }

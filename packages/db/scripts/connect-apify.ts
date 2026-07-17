@@ -116,7 +116,12 @@ async function main(): Promise<void> {
     await db.query(
       `insert into public.integration_health_checks (organization_id, connection_id, ok, latency_ms, detail)
        values ($1, $2, true, $3, $4)`,
-      [orgId, connectionId, test.latencyMs, `Connected as ${test.accountLabel ?? 'Apify account'} (CLI)`],
+      [
+        orgId,
+        connectionId,
+        test.latencyMs,
+        `Connected as ${test.accountLabel ?? 'Apify account'} (CLI)`,
+      ],
     );
     await db.query(
       `insert into public.audit_logs (organization_id, actor_user_id, actor_type, action, entity_kind, entity_id, details)

@@ -77,7 +77,10 @@ export function buildActorInput(config: SearchConfig): ApifyGoogleMapsInput {
   if (filters.excludeTemporarilyClosed && filters.excludePermanentlyClosed) {
     input.skipClosedPlaces = true;
   }
-  if (filters.includeCategories.length > 0) input.categoryFilterWords = filters.includeCategories;
+  // categoryFilterWords is deliberately NOT sent: the actor only accepts
+  // values from its fixed lowercase vocabulary and rejects the whole run
+  // otherwise. Category include/exclude is applied as a free local
+  // post-filter during normalization instead.
 
   if (config.includePlaceDetails) input.scrapePlaceDetailPage = true;
   if (config.includeCompanyContacts) input.scrapeContacts = true;

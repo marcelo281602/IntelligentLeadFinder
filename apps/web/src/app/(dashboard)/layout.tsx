@@ -6,17 +6,28 @@ import { listMyOrganizations, switchOrganization } from '@/actions/org';
 import { requireOrg } from '@/lib/auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { MobileNav, NavLinks } from '@/components/nav';
+import { InstallPwaButton } from '@/components/pwa';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireOrg();
   const orgs = await listMyOrganizations();
 
   const supabase = await createSupabaseServerClient();
-  const { count: unread } = await supabase
-    .from('notifications')
-    .select('id', { count: 'exact', head: true })
-    .eq('organization_id', ctx.orgId)
-    .is('read_at', null);
+  const [{ count: unread }, { data: orgPlan }] = await Promise.all([
+    supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', ctx.orgId)
+      .is('read_at', null),
+    supabase.from('organizations').select('plan, trial_ends_at').eq('id', ctx.orgId).maybeSingle(),
+  ]);
+
+  const trialDaysLeft =
+    orgPlan?.plan === 'trial'
+      ? Math.ceil((new Date(orgPlan.trial_ends_at as string).getTime() - Date.now()) / 86_400_000)
+      : null;
+  const showTrialBanner =
+    orgPlan?.plan === 'suspended' || (trialDaysLeft !== null && trialDaysLeft <= 3);
 
   return (
     <div className="flex min-h-dvh">
@@ -29,10 +40,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {brand.name}
         </Link>
         <NavLinks />
+        {ctx.isSuperAdmin ? (
+          <Link
+            href="/admin"
+            className="mt-1 flex items-center gap-2.5 rounded-md border border-dashed border-line-strong px-3 py-2 text-sm font-medium text-ink-soft hover:border-primary hover:text-primary"
+          >
+            Platform Admin →
+          </Link>
+        ) : null}
         <div className="mt-auto px-3 pt-6">
           <p className="overline">Workspace</p>
           <p className="truncate text-sm font-medium">{ctx.orgName}</p>
           <p className="text-xs text-ink-faint capitalize">{ctx.role}</p>
+          <InstallPwaButton />
         </div>
       </aside>
 
@@ -93,6 +113,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </header>
 
+        {showTrialBanner ? (
+          <p
+            role="status"
+            className={`px-4 py-2 text-center text-sm lg:px-8 ${
+              orgPlan?.plan === 'suspended' || (trialDaysLeft !== null && trialDaysLeft <= 0)
+                ? 'bg-danger-soft text-danger'
+                : 'bg-warn-soft text-warn'
+            }`}
+          >
+            {orgPlan?.plan === 'suspended'
+              ? 'This workspace is suspended — contact support.'
+              : trialDaysLeft !== null && trialDaysLeft <= 0
+                ? 'Your 14-day trial has ended. Paid runs are paused; test runs and all your data remain available. Contact support to activate.'
+                : `Trial: ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left. Contact support to activate the workspace.`}
+          </p>
+        ) : null}
         <main className="min-w-0 flex-1 px-4 py-6 lg:px-8">{children}</main>
 
         <footer className="border-t border-line px-4 py-3 text-xs text-ink-faint lg:px-8">

@@ -9,6 +9,9 @@ const PUBLIC_PATHS = [
   '/invite',
   '/api/webhooks',
   '/api/health',
+  '/manifest.webmanifest',
+  '/sw.js',
+  '/icons',
 ];
 
 /** Refresh the Supabase session cookie and gate authenticated routes. */

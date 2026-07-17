@@ -82,7 +82,10 @@ export async function requireOrg(): Promise<OrgContext> {
       .maybeSingle();
     membership = data as unknown as MembershipRow | null;
   }
-  if (!membership || !membership.organizations) redirect('/onboarding');
+  if (!membership || !membership.organizations) {
+    // Super-admins live in the platform console and need no workspace.
+    redirect(session.isSuperAdmin ? '/admin' : '/onboarding');
+  }
 
   return {
     ...session,
