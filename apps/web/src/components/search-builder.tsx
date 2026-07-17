@@ -246,7 +246,7 @@ export function SearchBuilder({
               <span className="mt-0.5 block text-base font-semibold">Business filters</span>
               <span className="text-xs text-ink-faint">
                 Star rating, website and closed-place filters are billed by the provider (
-                {countBillableFilters(config?.filters ?? ({} as never)) || 0} active). Phone, email
+                {config ? countBillableFilters(config.filters) : 0} active). Phone, email
                 and review-count filters are applied for free after collection.
               </span>
             </summary>

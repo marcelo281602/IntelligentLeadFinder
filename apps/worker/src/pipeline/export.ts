@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import ExcelJS from 'exceljs';
 import { columnsForKind, escapeFormulaInjection, toCsv, type CsvColumn } from '@leadfinder/core';
 import type { Db } from '../db';
@@ -116,7 +116,9 @@ export async function handleGenerateExport(db: Db, job: Job, storageDir: string)
   }
 
   const fileName = `${exp.id}.${exp.format}`;
-  const filePath = join(storageDir, exp.organization_id, fileName);
+  // Absolute path: the web app's download route runs in a different process
+  // (and cwd), so the stored path must not depend on the worker's cwd.
+  const filePath = resolve(join(storageDir, exp.organization_id, fileName));
   await mkdir(dirname(filePath), { recursive: true });
 
   let bytes: number;

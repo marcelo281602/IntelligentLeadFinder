@@ -47,7 +47,10 @@ Update this file whenever a durable decision is made.
 
 ## Blockers (require the user)
 
-1. **Apify API token** for the ≤10-record, low-cap smoke test (Provider Completion gate).
-2. **Hosted Supabase project** (URL, anon key, service-role key, DB password) — creating one is an external action.
-3. **Apollo commercial-use approval** — integration stays off without documented terms.
-4. **Deployment approval** — Vercel project, worker host, production env vars.
+1. ~~Hosted Supabase project~~ **RESOLVED 2026-07-17**: project `dyblidzhtgisnjjgwahd` connected; 7 migrations applied; demo workspace seeded; live fixture run completed through the real worker (9/2/3/4 counts verified). Credentials live only in gitignored `.env`.
+2. ~~Apify token~~ **PARTIALLY RESOLVED 2026-07-17**: token tested (account `expert_puppet`, FREE plan) and stored envelope-encrypted via `npm run connect:apify`. The ≤10-record **paid smoke run still awaits explicit user approval**. Note: FREE plan makes Business Leads enrichment ~20× pricier — first smoke should skip enrichment (~$0.04 for 10 places).
+3. **Supabase publishable key missing** (`sb_publishable_…`, Dashboard → Settings → API keys) — required for browser sign-in; server-side flows all work without it.
+4. **GitHub push blocked**: keychain credential is account `Eriin2816`, which lacks write access to `marcelo281602/IntelligentLeadFinder` (remote `origin` already configured). Fix: add Eriin2816 as collaborator OR supply a repo-scoped PAT for marcelo281602.
+5. **Apollo commercial-use approval** — integration stays off without documented terms.
+6. **Deployment approval** — Vercel project, worker host, production env vars.
+7. **Security follow-up**: DB password + sb_secret key were shared in chat — rotate both in the Supabase dashboard once setup is confirmed; change the demo user password.
