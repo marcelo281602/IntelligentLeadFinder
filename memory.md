@@ -58,3 +58,16 @@ Update this file whenever a durable decision is made.
 5. **Apollo commercial-use approval** — integration stays off without documented terms.
 6. **Deployment approval** — Vercel project, worker host, production env vars.
 8. **Security follow-up**: DB password, sb_secret key, Apify token, and the GitHub PAT were shared in chat — rotate all four after setup settles; change the demo user password (demo-password-change-me).
+
+## 2026-07-17 (live-run findings + platform batch)
+
+| Decision |
+| --- |
+| First real Apify run (Plumbers/CA, cap $1.61) exposed 3 bugs, all fixed: (1) `categoryFilterWords` has a restricted vocabulary → never sent anymore; categories are free local post-filters. (2) Worker dispatcher swallowed `'rescheduled'` from handleIngest → poll jobs died after one poll; return value now propagated (fixture tests can't catch this — fixture never reschedules). (3) "Has company email" without contact enrichment rejects 100% of results → UI now couples the two checkboxes. |
+| Operator recovery pattern established: paid raw records are re-normalizable at zero provider cost (relax snapshot post-filter + reset rawCursor + fresh normalize/reconcile jobs + audit `run.operator_renormalized`). Plumbers run recovered: 14 companies, 4 decision-makers, $0.49 actual. |
+| Migration 0009: `organizations.plan` (trial/active/suspended) + `trial_ends_at` (14-day default). Expired trial/suspended → paid confirmations blocked (fixture unaffected); banner ≤3 days. Only super-admins manage plans (audited). |
+| Super-admin console at /admin (Platform health + Clients tab). Super-admin = `user_profiles.is_super_admin`; marcelo281602@gmail.com granted. Reads via service client behind requireSuperAdmin — RLS untouched. |
+| Signup default = pre-confirmed account + immediate session (admin.createUser). `AUTH_EMAIL_VERIFICATION=required` restores the email-verification flow; Resend integration planned. |
+| PWA shipped: manifest route, generated PNG icons (scripted, zero-dep), pass-through service worker (no caching of authed data), beforeinstallprompt install button. Middleware allows manifest/sw/icons. |
+| Apify "pagination" reality: the actor cannot resume at an offset across runs — each run rescrapes from the top of search results and bills every scraped place again. Cost-safe daily patterns: (a) segment by location (different city/zip per day), (b) one larger run instead of N small ones, (c) dedupe already guarantees no duplicate records in-app. A "continuation runs" helper is roadmapped, not yet built. |
+| Outscraper/Prospeo/Apollo full adapters: NEXT work block (docs-verified endpoints, contract tests, connect/test UI; Apollo stays commercially gated regardless). |
