@@ -2,7 +2,12 @@ import type { ProviderKind } from '@leadfinder/core';
 import { ApifyGoogleMapsAdapter } from './apify/adapter';
 import { FixtureMapsAdapter } from './fixture/adapter';
 import { OutscraperMapsAdapter } from './outscraper/adapter';
-import { ProviderError, type MapsProviderAdapter } from './types';
+import { ProspeoEnrichmentAdapter } from './prospeo/adapter';
+import {
+  ProviderError,
+  type ContactEnrichmentAdapter,
+  type MapsProviderAdapter,
+} from './types';
 
 export * from './types';
 export { deliverToDestination, type DeliverResult } from './destinations';
@@ -31,11 +36,32 @@ export {
 } from './outscraper/adapter';
 export { OutscraperClient } from './outscraper/client';
 export {
-  apolloCapabilities,
-  assertApolloAllowed,
-  prospeoCapabilities,
-  type ApolloGateInput,
-} from './stubs';
+  ProspeoEnrichmentAdapter,
+  buildProspeoRequest,
+  mapProspeoPerson,
+} from './prospeo/adapter';
+export { ProspeoClient } from './prospeo/client';
+export { apolloCapabilities, assertApolloAllowed, type ApolloGateInput } from './stubs';
+
+/** Resolve the contact-enrichment adapter for a provider kind. */
+export function getEnrichmentAdapter(provider: ProviderKind): ContactEnrichmentAdapter {
+  switch (provider) {
+    case 'prospeo':
+      return new ProspeoEnrichmentAdapter();
+    case 'apollo':
+      throw new ProviderError(
+        'Apollo requires a documented commercial-use approval before any enablement.',
+        'feature_gated',
+        false,
+      );
+    default:
+      throw new ProviderError(
+        `${provider} is not a contact-enrichment provider.`,
+        'invalid_input',
+        false,
+      );
+  }
+}
 
 /** Resolve the Maps data-source adapter for a provider kind. */
 export function getMapsAdapter(provider: ProviderKind): MapsProviderAdapter {

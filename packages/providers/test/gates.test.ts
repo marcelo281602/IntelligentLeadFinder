@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getMapsAdapter } from '../src/index';
-import {
-  apolloCapabilities,
-  assertApolloAllowed,
-  prospeoCapabilities,
-} from '../src/stubs';
+import { getEnrichmentAdapter, getMapsAdapter } from '../src/index';
+import { apolloCapabilities, assertApolloAllowed } from '../src/stubs';
 import { ProviderError } from '../src/types';
 
 describe('Apollo commercial-use gate', () => {
@@ -33,21 +29,26 @@ describe('Apollo commercial-use gate', () => {
   });
 });
 
-describe('unimplemented providers stay honest', () => {
-  it('prospeo manifest declares no capabilities', () => {
-    expect(prospeoCapabilities().emailVerification).toBe(false);
-  });
-
-  it('adapter registry refuses non-Maps enrichment providers', () => {
+describe('adapter registries stay honest', () => {
+  it('Maps registry refuses contact-enrichment providers', () => {
     // Apollo and Prospeo are contact-enrichment providers, not Maps data
     // sources, so the Maps registry refuses them.
     expect(() => getMapsAdapter('apollo')).toThrow(ProviderError);
     expect(() => getMapsAdapter('prospeo')).toThrow(ProviderError);
   });
 
-  it('registry returns working adapters for apify, fixture, and outscraper', () => {
+  it('Maps registry returns working adapters for apify, fixture, and outscraper', () => {
     expect(getMapsAdapter('apify').provider).toBe('apify');
     expect(getMapsAdapter('fixture').provider).toBe('fixture');
     expect(getMapsAdapter('outscraper').provider).toBe('outscraper');
+  });
+
+  it('enrichment registry returns prospeo, keeps apollo gated, refuses Maps providers', () => {
+    const prospeo = getEnrichmentAdapter('prospeo');
+    expect(prospeo.provider).toBe('prospeo');
+    expect(prospeo.capabilities().emailVerification).toBe(true);
+    expect(prospeo.capabilities().decisionMakerDiscovery).toBe(false);
+    expect(() => getEnrichmentAdapter('apollo')).toThrow(/commercial-use approval/);
+    expect(() => getEnrichmentAdapter('apify')).toThrow(ProviderError);
   });
 });

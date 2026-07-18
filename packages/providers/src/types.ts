@@ -164,6 +164,51 @@ export interface MapContext {
   verificationRequested: boolean;
 }
 
+/**
+ * Identify one person to enrich. Minimum viable inputs (provider-validated):
+ * email alone, linkedinUrl alone, or a name plus a company identifier.
+ * `linkedinUrl` must originate from licensed provider data or manual entry —
+ * never from scraping (master-prompt rule 3).
+ */
+export interface EnrichContactQuery {
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  companyName?: string | null;
+  companyWebsite?: string | null;
+  linkedinUrl?: string | null;
+  email?: string | null;
+}
+
+export interface EnrichContactOptions {
+  /** Ask the provider to return a result only when the email is verified. */
+  onlyVerifiedEmail?: boolean;
+  /** Also reveal a mobile number (billed much higher — see the rate card). */
+  enrichMobile?: boolean;
+}
+
+export interface EnrichContactResult {
+  /** null = provider had no match (a normal zero-cost outcome). */
+  contact: MappedContact | null;
+  /** True when the provider charged nothing (no match or repeat within 90d). */
+  freeOfCharge: boolean;
+  /** Billable rate-card event keys consumed by this call (empty when free). */
+  billedEvents: string[];
+  warnings: string[];
+}
+
+/** Person-level contact enrichment adapter (email finder / verifier). */
+export interface ContactEnrichmentAdapter {
+  readonly provider: ProviderKind;
+  capabilities(): CapabilityManifest;
+  testConnection(credentials: ProviderCredentials): Promise<ConnectionTestResult>;
+  enrichContact(
+    credentials: ProviderCredentials,
+    query: EnrichContactQuery,
+    options?: EnrichContactOptions,
+  ): Promise<EnrichContactResult>;
+}
+
 export class ProviderError extends Error {
   constructor(
     message: string,

@@ -8,21 +8,6 @@ import { ProviderError, type CapabilityManifest } from './types';
  * commercial-use approval row.
  */
 
-export function prospeoCapabilities(): CapabilityManifest {
-  return {
-    provider: 'prospeo',
-    companyCollection: false,
-    companyContactEnrichment: false,
-    decisionMakerDiscovery: false,
-    emailVerification: false,
-    phoneEnrichment: false,
-    notes: [
-      'Adapter not yet implemented — planned for email finding/verification',
-      'Capabilities will be published per-account after connection testing',
-    ],
-  };
-}
-
 export interface ApolloGateInput {
   /** True only when a commercial_use_approvals row exists and is approved. */
   commercialUseApproved: boolean;

@@ -139,6 +139,40 @@ export function outscraperMapsRateCard(): RateCard {
   };
 }
 
+export type ProspeoPlanTier = 'free' | 'basic' | 'pro' | 'business' | 'corporate';
+
+/**
+ * Prospeo per-credit USD (verified 2026-07-18): Free 75 credits/mo ($0),
+ * Basic $39/1,000, Pro $99/5,000, Business $199/20,000, Corporate $369/50,000.
+ * Email enrichment = 1 credit; mobile = 10 credits. No-match and repeat
+ * enrichment within 90 days cost 0.
+ */
+const PROSPEO_CREDIT_USD: Record<ProspeoPlanTier, number> = {
+  free: 0,
+  basic: 39 / 1000,
+  pro: 99 / 5000,
+  business: 199 / 20_000,
+  corporate: 369 / 50_000,
+};
+
+export function prospeoRateCard(planTier: ProspeoPlanTier): RateCard {
+  const credit = PROSPEO_CREDIT_USD[planTier];
+  return {
+    provider: 'prospeo',
+    scope: 'enrich-person',
+    planTier,
+    currency: 'USD',
+    version: 1,
+    lastVerifiedAt: '2026-07-18',
+    sourceUrl: 'https://prospeo.io/pricing',
+    events: {
+      email_enrichment: usdToMicro(credit),
+      mobile_enrichment: usdToMicro(credit * 10),
+    },
+    assumptions: DEFAULT_ASSUMPTIONS,
+  };
+}
+
 /** Fixture provider is free — used for deterministic local preview and tests. */
 export function fixtureRateCard(): RateCard {
   return {

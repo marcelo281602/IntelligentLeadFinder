@@ -1,8 +1,9 @@
 import { hasPermission } from '@leadfinder/core';
-import { apolloCapabilities, prospeoCapabilities } from '@leadfinder/providers';
+import { apolloCapabilities, ProspeoEnrichmentAdapter } from '@leadfinder/providers';
 import {
   connectApify,
   connectOutscraper,
+  connectProspeo,
   disconnectConnection,
   rotateCredential,
   testConnection,
@@ -66,15 +67,12 @@ export default async function IntegrationsPage({
   const apifyConnections = (connections ?? []).filter((c) => c.provider === 'apify');
   const outscraperConnections = (connections ?? []).filter((c) => c.provider === 'outscraper');
   const outscraperEnabled = flagEnabled('provider_outscraper');
+  const prospeoConnections = (connections ?? []).filter((c) => c.provider === 'prospeo');
+  const prospeoEnabled = flagEnabled('provider_prospeo');
+  const prospeoNotes = new ProspeoEnrichmentAdapter().capabilities().notes;
   const fixtureConnection = (connections ?? []).find((c) => c.provider === 'fixture');
 
   const gatedProviders = [
-    {
-      name: 'Prospeo',
-      category: 'Contact enrichment',
-      caps: prospeoCapabilities(),
-      flag: flagEnabled('provider_prospeo'),
-    },
     {
       name: 'Apollo',
       category: 'Decision-maker enrichment',
@@ -103,7 +101,12 @@ export default async function IntegrationsPage({
       ) : null}
       {params.connected ? (
         <p className="rounded-md bg-ok-soft px-4 py-3 text-sm text-ok">
-          {params.connected === 'outscraper' ? 'Outscraper' : 'Apify'} connected and verified.
+          {params.connected === 'outscraper'
+            ? 'Outscraper'
+            : params.connected === 'prospeo'
+              ? 'Prospeo'
+              : 'Apify'}{' '}
+          connected and verified.
         </p>
       ) : null}
       {params.rotated ? (
@@ -494,6 +497,182 @@ export default async function IntegrationsPage({
           provider results.
         </p>
       </Card>
+
+      {prospeoEnabled ? (
+        <>
+          <p className="overline">Contact enrichment</p>
+          <Card className="rise rise-2">
+            <CardHeader
+              overline="Email finder + verifier — 1 credit per email, repeat lookups free for 90 days"
+              title="Prospeo"
+              action={
+                prospeoConnections.length > 0 ? (
+                  <Badge tone="ok">Connected</Badge>
+                ) : (
+                  <Badge tone="neutral">Not connected</Badge>
+                )
+              }
+            />
+            <div className="space-y-4 p-5">
+              {prospeoConnections.map((conn) => {
+                const config = (conn.config ?? {}) as { planTier?: string };
+                return (
+                  <div key={conn.id} className="rounded-md border border-line bg-raised p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium">
+                          {conn.label}
+                          <span className="ml-2 text-xs text-ink-faint">
+                            {config.planTier ?? 'basic'} plan
+                            {conn.secret_fingerprint ? (
+                              <>
+                                {' '}
+                                · fp <code className="mono">{conn.secret_fingerprint}</code>
+                              </>
+                            ) : null}
+                          </span>
+                        </p>
+                        <p className="text-xs text-ink-faint">
+                          {conn.last_test_ok ? 'Healthy' : (conn.last_error ?? 'Untested')} · last
+                          tested {formatDateTime(conn.last_test_at)}
+                          {conn.last_used_at
+                            ? ` · last used ${formatDateTime(conn.last_used_at)}`
+                            : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          tone={
+                            conn.status === 'connected'
+                              ? 'ok'
+                              : conn.status === 'error'
+                                ? 'danger'
+                                : 'neutral'
+                          }
+                        >
+                          {conn.status}
+                        </Badge>
+                        <form action={testConnection}>
+                          <input type="hidden" name="connectionId" value={conn.id} />
+                          <Button variant="secondary" type="submit">
+                            Test connection
+                          </Button>
+                        </form>
+                      </div>
+                    </div>
+                    {canManage && conn.status !== 'disconnected' ? (
+                      <details className="mt-3">
+                        <summary className="cursor-pointer text-sm text-primary select-none">
+                          Rotate credential or disconnect
+                        </summary>
+                        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                          <form
+                            action={rotateCredential}
+                            className="space-y-2 rounded-md border border-line p-3"
+                          >
+                            <input type="hidden" name="connectionId" value={conn.id} />
+                            <p className="text-sm font-medium">Rotate API key</p>
+                            <Input
+                              name="token"
+                              type="password"
+                              placeholder="New Prospeo API key"
+                              autoComplete="off"
+                              required
+                            />
+                            <Input
+                              name="confirmPassword"
+                              type="password"
+                              placeholder="Your account password"
+                              autoComplete="current-password"
+                              required
+                            />
+                            <Button variant="secondary" type="submit">
+                              Rotate
+                            </Button>
+                          </form>
+                          <form
+                            action={disconnectConnection}
+                            className="space-y-2 rounded-md border border-line p-3"
+                          >
+                            <input type="hidden" name="connectionId" value={conn.id} />
+                            <p className="text-sm font-medium">Disconnect</p>
+                            <p className="text-xs text-ink-faint">
+                              Revokes the stored credential. Run history and provenance are kept.
+                            </p>
+                            <Input
+                              name="confirmPassword"
+                              type="password"
+                              placeholder="Your account password"
+                              autoComplete="current-password"
+                              required
+                            />
+                            <Button variant="danger" type="submit">
+                              Disconnect
+                            </Button>
+                          </form>
+                        </div>
+                      </details>
+                    ) : null}
+                  </div>
+                );
+              })}
+
+              {canManage ? (
+                <details open={prospeoConnections.length === 0}>
+                  <summary className="cursor-pointer text-sm font-medium text-primary select-none">
+                    {prospeoConnections.length === 0
+                      ? 'Connect Prospeo'
+                      : 'Add another Prospeo connection'}
+                  </summary>
+                  <form action={connectProspeo} className="mt-3 grid gap-4 sm:grid-cols-2">
+                    <Field
+                      label="API key"
+                      htmlFor="prospeo-token"
+                      hint="app.prospeo.io → API. Verified via the free account endpoint; stored encrypted."
+                    >
+                      <Input
+                        id="prospeo-token"
+                        name="token"
+                        type="password"
+                        autoComplete="off"
+                        required
+                      />
+                    </Field>
+                    <Field label="Label" htmlFor="prospeo-label">
+                      <Input id="prospeo-label" name="label" defaultValue="Default" />
+                    </Field>
+                    <Field
+                      label="Plan tier"
+                      htmlFor="prospeo-plan"
+                      hint="Sets the rate card used for enrichment estimates"
+                    >
+                      <Select id="prospeo-plan" name="planTier" defaultValue="basic">
+                        <option value="free">Free (75 credits/mo)</option>
+                        <option value="basic">Basic ($39 / 1,000)</option>
+                        <option value="pro">Pro ($99 / 5,000)</option>
+                        <option value="business">Business ($199 / 20,000)</option>
+                        <option value="corporate">Corporate ($369 / 50,000)</option>
+                      </Select>
+                    </Field>
+                    <div className="sm:col-span-2">
+                      <Button type="submit">Test &amp; connect</Button>
+                    </div>
+                  </form>
+                </details>
+              ) : (
+                <p className="text-xs text-ink-faint">
+                  Only owners and admins can manage provider credentials.
+                </p>
+              )}
+              <ul className="space-y-1 text-xs text-ink-faint">
+                {prospeoNotes.map((note) => (
+                  <li key={note}>• {note}</li>
+                ))}
+              </ul>
+            </div>
+          </Card>
+        </>
+      ) : null}
 
       <DestinationsSection
         destinations={(destinations ?? []) as DestinationRow[]}
