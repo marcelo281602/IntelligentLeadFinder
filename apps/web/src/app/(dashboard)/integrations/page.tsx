@@ -1,5 +1,5 @@
 import { hasPermission } from '@leadfinder/core';
-import { apolloCapabilities, ProspeoEnrichmentAdapter } from '@leadfinder/providers';
+import { ProspeoEnrichmentAdapter } from '@leadfinder/providers';
 import {
   connectApify,
   connectOutscraper,
@@ -37,33 +37,27 @@ export default async function IntegrationsPage({
   const canDestinations = hasPermission(ctx.role, 'destinations:sync', ctx.overrides);
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: connections }, { data: flags }, { data: approvals }, { data: destinations }] =
-    await Promise.all([
-      supabase
-        .from('integration_connections')
-        .select(
-          'id, provider, label, status, config, secret_fingerprint, last_test_at, last_test_ok, last_error, last_used_at, created_at',
-        )
-        .eq('organization_id', ctx.orgId)
-        .is('deleted_at', null)
-        .order('created_at'),
-      supabase.from('feature_flags').select('key, enabled').is('organization_id', null),
-      supabase
-        .from('commercial_use_approvals')
-        .select('provider, approved')
-        .eq('provider', 'apollo'),
-      supabase
-        .from('destinations')
-        .select(
-          'id, kind, name, endpoint_url, status, auto_sync, include_contacts, synced_count, last_sync_at, last_error, secret_fingerprint',
-        )
-        .eq('organization_id', ctx.orgId)
-        .is('deleted_at', null)
-        .order('created_at'),
-    ]);
+  const [{ data: connections }, { data: flags }, { data: destinations }] = await Promise.all([
+    supabase
+      .from('integration_connections')
+      .select(
+        'id, provider, label, status, config, secret_fingerprint, last_test_at, last_test_ok, last_error, last_used_at, created_at',
+      )
+      .eq('organization_id', ctx.orgId)
+      .is('deleted_at', null)
+      .order('created_at'),
+    supabase.from('feature_flags').select('key, enabled').is('organization_id', null),
+    supabase
+      .from('destinations')
+      .select(
+        'id, kind, name, endpoint_url, status, auto_sync, include_contacts, synced_count, last_sync_at, last_error, secret_fingerprint',
+      )
+      .eq('organization_id', ctx.orgId)
+      .is('deleted_at', null)
+      .order('created_at'),
+  ]);
 
   const flagEnabled = (key: string) => (flags ?? []).find((f) => f.key === key)?.enabled ?? false;
-  const apolloApproved = (approvals ?? []).some((a) => a.approved);
   const apifyConnections = (connections ?? []).filter((c) => c.provider === 'apify');
   const outscraperConnections = (connections ?? []).filter((c) => c.provider === 'outscraper');
   const outscraperEnabled = flagEnabled('provider_outscraper');
@@ -71,18 +65,6 @@ export default async function IntegrationsPage({
   const prospeoEnabled = flagEnabled('provider_prospeo');
   const prospeoNotes = new ProspeoEnrichmentAdapter().capabilities().notes;
   const fixtureConnection = (connections ?? []).find((c) => c.provider === 'fixture');
-
-  const gatedProviders = [
-    {
-      name: 'Apollo',
-      category: 'Decision-maker enrichment',
-      caps: apolloCapabilities({
-        commercialUseApproved: apolloApproved,
-        featureFlagEnabled: flagEnabled('provider_apollo'),
-      }),
-      flag: flagEnabled('provider_apollo'),
-    },
-  ];
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -679,30 +661,6 @@ export default async function IntegrationsPage({
         canManage={canDestinations}
       />
 
-      <p className="overline">Planned providers</p>
-      <div className="grid gap-4 md:grid-cols-2">
-        {gatedProviders.map((provider, i) => (
-          <Card key={provider.name} className={`rise rise-${Math.min(i + 2, 4)} p-5`}>
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold">{provider.name}</h2>
-              <Badge tone={provider.flag ? 'accent' : 'neutral'}>
-                {provider.flag ? 'Flagged on' : 'Not available'}
-              </Badge>
-            </div>
-            <p className="mt-0.5 text-xs text-ink-faint">{provider.category}</p>
-            <ul className="mt-3 space-y-1 text-xs text-ink-soft">
-              {provider.caps.notes.map((note) => (
-                <li key={note}>• {note}</li>
-              ))}
-            </ul>
-          </Card>
-        ))}
-      </div>
-      <p className="text-xs text-ink-faint">
-        Apollo remains disabled for all workspaces until a documented commercial-use approval exists
-        — its public plans do not permit powering an external product, and bring-your-own-key does
-        not change that.
-      </p>
     </div>
   );
 }
