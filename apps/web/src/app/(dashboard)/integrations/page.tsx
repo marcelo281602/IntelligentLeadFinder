@@ -32,6 +32,7 @@ export default async function IntegrationsPage({
     dname?: string;
     dtested?: string;
     dsync?: string;
+    dgoauth?: string;
   }>;
 }) {
   const ctx = await requireOrg();
@@ -53,7 +54,7 @@ export default async function IntegrationsPage({
     supabase
       .from('destinations')
       .select(
-        'id, kind, name, endpoint_url, status, auto_sync, include_contacts, synced_count, last_sync_at, last_error, secret_fingerprint',
+        'id, kind, connection_method, name, endpoint_url, google_account_email, status, auto_sync, include_contacts, synced_count, last_sync_at, last_error, secret_fingerprint',
       )
       .eq('organization_id', ctx.orgId)
       .is('deleted_at', null)
@@ -126,6 +127,12 @@ export default async function IntegrationsPage({
       {params.dsync ? (
         <p className="rounded-md bg-ok-soft px-4 py-3 text-sm text-ok">
           Sync queued — new leads will appear in your destination shortly.
+        </p>
+      ) : null}
+      {params.dgoauth ? (
+        <p className="rounded-md bg-ok-soft px-4 py-3 text-sm text-ok">
+          Google Sheet connected — a new sheet was created in your Drive and future leads will sync
+          to it. Click <strong>Test</strong> on it to drop in a sample row.
         </p>
       ) : null}
       {params.dsecret ? (
@@ -822,6 +829,9 @@ export default async function IntegrationsPage({
       <DestinationsSection
         destinations={(destinations ?? []) as DestinationRow[]}
         canManage={canDestinations}
+        googleOAuthEnabled={Boolean(
+          process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+        )}
       />
 
     </div>

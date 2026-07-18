@@ -15,8 +15,10 @@ import { formatDateTime } from '@/lib/format';
 export interface DestinationRow {
   id: string;
   kind: DestinationKind;
+  connection_method: 'apps_script' | 'google_oauth';
   name: string;
   endpoint_url: string;
+  google_account_email: string | null;
   status: string;
   auto_sync: boolean;
   include_contacts: boolean;
@@ -56,17 +58,32 @@ function doPost(e) {
 }`;
 }
 
+type Method = 'google_oauth' | 'apps_script';
+
 export function DestinationsSection({
   destinations,
   canManage,
+  googleOAuthEnabled,
 }: {
   destinations: DestinationRow[];
   canManage: boolean;
+  googleOAuthEnabled: boolean;
 }) {
   const [kind, setKind] = useState<DestinationKind>('google_sheets');
+  const [method, setMethod] = useState<Method>(googleOAuthEnabled ? 'google_oauth' : 'apps_script');
+  const [name, setName] = useState('');
+  const [includeContacts, setIncludeContacts] = useState(false);
+  const [autoSync, setAutoSync] = useState(true);
   const [copied, setCopied] = useState(false);
   const secret = useMemo(() => randomSecret(), []);
   const script = useMemo(() => appsScript(secret), [secret]);
+
+  const isSheets = kind === 'google_sheets';
+  const useGoogle = isSheets && googleOAuthEnabled && method === 'google_oauth';
+
+  const googleHref =
+    `/api/oauth/google/start?name=${encodeURIComponent(name || 'Google Sheet')}` +
+    `&includeContacts=${includeContacts ? '1' : '0'}&autoSync=${autoSync ? '1' : '0'}`;
 
   return (
     <div className="space-y-4">
@@ -89,11 +106,26 @@ export function DestinationsSection({
                     {dest.name}
                     <span className="ml-2 text-xs text-ink-faint">
                       {DESTINATION_LABELS[dest.kind]}
+                      {dest.connection_method === 'google_oauth' ? ' · Google sign-in' : ''}
                     </span>
                   </p>
-                  <p className="max-w-[46ch] truncate text-xs text-ink-faint">
-                    {dest.endpoint_url}
-                  </p>
+                  {dest.connection_method === 'google_oauth' ? (
+                    <p className="text-xs text-ink-faint">
+                      {dest.google_account_email ? `${dest.google_account_email} · ` : ''}
+                      <a
+                        href={dest.endpoint_url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-primary hover:underline"
+                      >
+                        Open sheet ↗
+                      </a>
+                    </p>
+                  ) : (
+                    <p className="max-w-[46ch] truncate text-xs text-ink-faint">
+                      {dest.endpoint_url}
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-ink-faint">
                     {dest.synced_count} lead(s) synced
                     {dest.last_sync_at
@@ -177,7 +209,100 @@ export function DestinationsSection({
                 </Select>
               </Field>
 
-              {kind === 'google_sheets' ? (
+              {/* Shared fields both methods use. */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Name" htmlFor="dest-name">
+                  <Input
+                    id="dest-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Client leads sheet"
+                    maxLength={120}
+                  />
+                </Field>
+              </div>
+              <div className="flex flex-wrap gap-4 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={autoSync}
+                    onChange={(e) => setAutoSync(e.target.checked)}
+                    className="size-4 accent-[#2f4f7d]"
+                  />
+                  Auto-sync new leads when a search completes
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={includeContacts}
+                    onChange={(e) => setIncludeContacts(e.target.checked)}
+                    className="size-4 accent-[#2f4f7d]"
+                  />
+                  Include decision-maker columns
+                </label>
+              </div>
+
+              {/* Connection method chooser (Google Sheets only). */}
+              {isSheets && googleOAuthEnabled ? (
+                <div
+                  role="radiogroup"
+                  aria-label="Connection method"
+                  className="flex flex-wrap gap-2"
+                >
+                  {(
+                    [
+                      ['google_oauth', 'Sign in with Google', 'Easiest — we create the sheet'],
+                      ['apps_script', 'Apps Script (webhook)', 'Advanced — paste a script'],
+                    ] as const
+                  ).map(([m, label, hint]) => (
+                    <button
+                      key={m}
+                      type="button"
+                      role="radio"
+                      aria-checked={method === m}
+                      onClick={() => setMethod(m)}
+                      className={cx(
+                        'flex-1 rounded-md border px-3 py-2 text-left text-sm transition-colors',
+                        method === m
+                          ? 'border-primary bg-primary-soft'
+                          : 'border-line hover:border-line-strong',
+                      )}
+                    >
+                      <span className="block font-medium">{label}</span>
+                      <span className="block text-xs text-ink-faint">{hint}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {useGoogle ? (
+                <div className="rounded-md border border-line bg-raised p-4 text-sm">
+                  <p className="text-ink-soft">
+                    We&apos;ll create a new Google Sheet in your Drive called{' '}
+                    <strong>{`LeadFinder — ${name || 'Google Sheet'}`}</strong> and append leads to
+                    it. You grant access only to that one file (the <code className="mono">
+                      drive.file
+                    </code>{' '}
+                    scope) — LeadFinder can&apos;t see anything else in your Drive.
+                  </p>
+                  <a
+                    href={googleHref}
+                    className="mt-3 inline-flex items-center gap-2 rounded-md border border-line-strong bg-surface px-4 py-2 font-medium text-ink shadow-sm hover:bg-canvas"
+                  >
+                    <span
+                      aria-hidden
+                      className="flex size-4 items-center justify-center rounded-full bg-[#4285F4] text-[10px] font-bold text-white"
+                    >
+                      G
+                    </span>
+                    Continue with Google
+                  </a>
+                  <p className="mt-2 text-xs text-ink-faint">
+                    You&apos;ll pick your Google account and approve access, then land back here with
+                    the sheet connected.
+                  </p>
+                </div>
+              ) : isSheets ? (
                 <div className="rounded-md border border-line bg-raised p-4 text-sm">
                   <p className="font-medium">Set up your Google Sheet (one time)</p>
                   <ol className="mt-2 list-decimal space-y-1 pl-5 text-ink-soft">
@@ -225,21 +350,16 @@ export function DestinationsSection({
                 </p>
               )}
 
-              <form action={createDestination} className="space-y-4">
-                <input type="hidden" name="kind" value={kind} />
-                <input type="hidden" name="secret" value={secret} />
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Name" htmlFor="dest-name">
-                    <Input
-                      id="dest-name"
-                      name="name"
-                      placeholder="Client leads sheet"
-                      required
-                      maxLength={120}
-                    />
-                  </Field>
+              {/* Apps Script / webhook submit (Google path uses the button above). */}
+              {!useGoogle ? (
+                <form action={createDestination} className="space-y-4">
+                  <input type="hidden" name="kind" value={kind} />
+                  <input type="hidden" name="secret" value={secret} />
+                  <input type="hidden" name="name" value={name} />
+                  {autoSync ? <input type="hidden" name="autoSync" value="on" /> : null}
+                  {includeContacts ? <input type="hidden" name="includeContacts" value="on" /> : null}
                   <Field
-                    label={kind === 'google_sheets' ? 'Web app URL' : 'Webhook URL'}
+                    label={isSheets ? 'Web app URL' : 'Webhook URL'}
                     htmlFor="dest-url"
                     hint="HTTPS only"
                   >
@@ -251,34 +371,15 @@ export function DestinationsSection({
                       required
                     />
                   </Field>
-                </div>
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      name="autoSync"
-                      defaultChecked
-                      className="size-4 accent-[#2f4f7d]"
-                    />
-                    Auto-sync new leads when a search completes
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      name="includeContacts"
-                      className="size-4 accent-[#2f4f7d]"
-                    />
-                    Include decision-maker columns
-                  </label>
-                </div>
-                <div className={cx('flex items-center gap-3')}>
-                  <Button type="submit">Save destination</Button>
-                  <span className="text-xs text-ink-faint">
-                    Tip: click <strong>Test</strong> afterwards to drop one sample row into the
-                    sheet.
-                  </span>
-                </div>
-              </form>
+                  <div className={cx('flex items-center gap-3')}>
+                    <Button type="submit">Save destination</Button>
+                    <span className="text-xs text-ink-faint">
+                      Tip: click <strong>Test</strong> afterwards to drop one sample row into the
+                      sheet.
+                    </span>
+                  </div>
+                </form>
+              ) : null}
             </div>
           </details>
         </Card>

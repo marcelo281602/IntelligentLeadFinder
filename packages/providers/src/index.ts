@@ -13,6 +13,17 @@ import {
 export * from './types';
 export { deliverToDestination, type DeliverResult } from './destinations';
 export {
+  GOOGLE_OAUTH_SCOPES,
+  GoogleSheetsError,
+  buildGoogleAuthUrl,
+  exchangeCodeForTokens,
+  refreshAccessToken,
+  getGoogleAccountEmail,
+  createLeadsSpreadsheet,
+  appendRows,
+  type GoogleOAuthConfig,
+} from './google-sheets';
+export {
   ApifyGoogleMapsAdapter,
   buildActorInput,
   mapPlaceItem,

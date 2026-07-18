@@ -91,7 +91,9 @@ export async function testDestination(formData: FormData): Promise<void> {
   const service = createServiceClient();
   const { data: dest } = await service
     .from('destinations')
-    .select('id, kind, name, endpoint_url, secret_envelope, include_contacts')
+    .select(
+      'id, kind, connection_method, name, endpoint_url, secret_envelope, include_contacts, spreadsheet_id, sheet_tab, header_written',
+    )
     .eq('id', id.data)
     .eq('organization_id', ctx.orgId)
     .is('deleted_at', null)
@@ -99,40 +101,66 @@ export async function testDestination(formData: FormData): Promise<void> {
   if (!dest) redirect('/integrations');
 
   const { decryptSecret } = await import('@leadfinder/security');
-  const secret = decryptSecret(dest.secret_envelope, process.env.APP_ENCRYPTION_KEY!);
-  const payload = buildDestinationPayload({
-    destinationName: dest.name,
-    secret,
-    runId: null,
-    kind: dest.kind as DestinationKind,
-    includeContacts: dest.include_contacts,
-    leads: [
-      {
-        companyName: 'LeadFinder Test Row',
-        category: 'Connection test',
-        website: 'https://example.com',
-        companyEmail: 'test@example.com',
-        companyPhone: '+10000000000',
-        companyLinkedin: null,
-        address: '1 Test Street',
-        city: 'Testville',
-        country: 'US',
-        rating: 5,
-        reviews: 1,
-        mapsUrl: null,
-        placeId: null,
-        source: 'leadfinder-test',
-        contactName: null,
-        contactTitle: null,
-        contactWorkEmail: null,
-        contactEmailStatus: null,
-        contactPhone: null,
-        contactPersonalLinkedin: null,
-        collectedAt: new Date().toISOString(),
-      },
-    ],
-  });
-  const result = await deliverToDestination({ endpointUrl: dest.endpoint_url, secret, payload });
+  const testLead = {
+    companyName: 'LeadFinder Test Row',
+    category: 'Connection test',
+    website: 'https://example.com',
+    companyEmail: 'test@example.com',
+    companyPhone: '+10000000000',
+    companyLinkedin: null,
+    address: '1 Test Street',
+    city: 'Testville',
+    country: 'US',
+    rating: 5,
+    reviews: 1,
+    mapsUrl: null,
+    placeId: null,
+    source: 'leadfinder-test',
+    contactName: null,
+    contactTitle: null,
+    contactWorkEmail: null,
+    contactEmailStatus: null,
+    contactPhone: null,
+    contactPersonalLinkedin: null,
+    collectedAt: new Date().toISOString(),
+  };
+
+  let result: { ok: boolean; error?: string };
+  if (dest.connection_method === 'google_oauth') {
+    // Append a sample row straight to the sheet via the OAuth refresh token.
+    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+    try {
+      if (!clientId || !clientSecret) throw new Error('Google OAuth is not configured.');
+      if (!dest.spreadsheet_id) throw new Error('Destination is missing its spreadsheet id.');
+      const { refreshAccessToken, appendRows } = await import('@leadfinder/providers');
+      const { destinationColumns, destinationRow } = await import('@leadfinder/core');
+      const refreshToken = decryptSecret(dest.secret_envelope, process.env.APP_ENCRYPTION_KEY!);
+      const accessToken = await refreshAccessToken({ clientId, clientSecret }, refreshToken);
+      const row = destinationRow(testLead, dest.include_contacts, 'google_sheets');
+      const rows = dest.header_written
+        ? [row]
+        : [destinationColumns(dest.include_contacts), row];
+      await appendRows(accessToken, dest.spreadsheet_id, dest.sheet_tab ?? 'Leads', rows);
+      if (!dest.header_written) {
+        await service.from('destinations').update({ header_written: true }).eq('id', dest.id);
+      }
+      result = { ok: true };
+    } catch (error) {
+      result = { ok: false, error: error instanceof Error ? error.message : 'Test failed' };
+    }
+  } else {
+    const secret = decryptSecret(dest.secret_envelope, process.env.APP_ENCRYPTION_KEY!);
+    const payload = buildDestinationPayload({
+      destinationName: dest.name,
+      secret,
+      runId: null,
+      kind: dest.kind as DestinationKind,
+      includeContacts: dest.include_contacts,
+      leads: [testLead],
+    });
+    result = await deliverToDestination({ endpointUrl: dest.endpoint_url, secret, payload });
+  }
   await service
     .from('destinations')
     .update({

@@ -30,6 +30,11 @@ const serverEnvSchema = z.object({
   // Shared secret that gates the /api/cron/worker route. Vercel Cron sends it
   // as `Authorization: Bearer <CRON_SECRET>` when this env var is set.
   CRON_SECRET: z.string().min(16).optional(),
+  // Google OAuth (optional): enables the "Sign in with Google" Sheets
+  // destination. Uses the non-sensitive drive.file scope. When unset, only
+  // the Apps Script / webhook destination path is offered.
+  GOOGLE_OAUTH_CLIENT_ID: z.string().min(10).optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(10).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

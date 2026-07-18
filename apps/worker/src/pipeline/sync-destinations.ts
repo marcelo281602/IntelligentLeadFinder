@@ -1,10 +1,15 @@
 import {
   buildDestinationPayload,
+  destinationColumns,
   type DestinationKind,
   type DestinationLead,
 } from '@leadfinder/core';
 import { decryptSecret } from '@leadfinder/security';
-import { deliverToDestination } from '@leadfinder/providers';
+import {
+  appendRows,
+  deliverToDestination,
+  refreshAccessToken,
+} from '@leadfinder/providers';
 import type { Db } from '../db';
 import { one } from '../db';
 import { auditLog, notify } from '../ledger';
@@ -17,12 +22,82 @@ interface DestinationRow {
   id: string;
   organization_id: string;
   kind: DestinationKind;
+  connection_method: 'apps_script' | 'google_oauth';
   name: string;
   endpoint_url: string;
   secret_envelope: string;
   include_contacts: boolean;
   status: string;
   created_by: string;
+  spreadsheet_id: string | null;
+  sheet_tab: string | null;
+  header_written: boolean;
+}
+
+/**
+ * Deliver a batch either over the signed webhook (Apps Script / n8n / …) or
+ * directly to a Google Sheet via the OAuth refresh token. Returns an error
+ * string on failure, or null on success. Delivery-ledger writes happen in the
+ * caller only after this resolves successfully, so a failure never marks
+ * leads as delivered.
+ */
+async function deliverBatch(
+  db: Db,
+  dest: DestinationRow,
+  leads: DestinationLead[],
+  runId: string | null,
+  masterKey: string,
+): Promise<string | null> {
+  if (dest.connection_method === 'google_oauth') {
+    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+    if (!clientId || !clientSecret) return 'Google OAuth is not configured on the server.';
+    if (!dest.spreadsheet_id) return 'Destination is missing its spreadsheet id.';
+
+    const refreshToken = decryptSecret(dest.secret_envelope, masterKey);
+    let accessToken: string;
+    try {
+      accessToken = await refreshAccessToken({ clientId, clientSecret }, refreshToken);
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Could not refresh Google access.';
+    }
+
+    const tab = dest.sheet_tab ?? 'Leads';
+    // Column header once, then the data rows (both formula-escaped as a sheet).
+    const payload = buildDestinationPayload({
+      destinationName: dest.name,
+      secret: '',
+      runId,
+      kind: 'google_sheets',
+      includeContacts: dest.include_contacts,
+      leads,
+    });
+    const rows = dest.header_written
+      ? payload.rows
+      : [destinationColumns(dest.include_contacts), ...payload.rows];
+    try {
+      await appendRows(accessToken, dest.spreadsheet_id, tab, rows);
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Sheets append failed.';
+    }
+    if (!dest.header_written) {
+      await db.query(`update public.destinations set header_written = true where id = $1`, [dest.id]);
+    }
+    return null;
+  }
+
+  // Apps Script / webhook path: signed HTTPS POST.
+  const secret = decryptSecret(dest.secret_envelope, masterKey);
+  const payload = buildDestinationPayload({
+    destinationName: dest.name,
+    secret,
+    runId,
+    kind: dest.kind,
+    includeContacts: dest.include_contacts,
+    leads,
+  });
+  const result = await deliverToDestination({ endpointUrl: dest.endpoint_url, secret, payload });
+  return result.ok ? null : (result.error ?? 'Destination delivery failed');
 }
 
 /**
@@ -40,7 +115,8 @@ export async function handleSyncDestination(db: Db, job: Job, masterKey: string)
 
   const dest = await one<DestinationRow>(
     db,
-    `select id, organization_id, kind, name, endpoint_url, secret_envelope, include_contacts, status, created_by
+    `select id, organization_id, kind, connection_method, name, endpoint_url, secret_envelope,
+            include_contacts, status, created_by, spreadsheet_id, sheet_tab, header_written
      from public.destinations where id = $1 and deleted_at is null`,
     [destinationId],
   );
@@ -124,23 +200,13 @@ export async function handleSyncDestination(db: Db, job: Job, masterKey: string)
     };
   });
 
-  const secret = decryptSecret(dest.secret_envelope, masterKey);
-  const payload = buildDestinationPayload({
-    destinationName: dest.name,
-    secret,
-    runId,
-    kind: dest.kind,
-    includeContacts: dest.include_contacts,
-    leads,
-  });
-
-  const result = await deliverToDestination({ endpointUrl: dest.endpoint_url, secret, payload });
-  if (!result.ok) {
+  const deliveryError = await deliverBatch(db, dest, leads, runId, masterKey);
+  if (deliveryError) {
     await db.query(
       `update public.destinations set status = 'error', last_error = $2 where id = $1`,
-      [dest.id, result.error ?? 'Delivery failed'],
+      [dest.id, deliveryError],
     );
-    throw new Error(result.error ?? 'Destination delivery failed');
+    throw new Error(deliveryError);
   }
 
   // Record deliveries so these leads are never re-sent. Whole-batch atomicity:
