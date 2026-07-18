@@ -6,14 +6,26 @@
 
 - **Web**: Vercel (`apps/web`; root directory = repo root, build command
   `npm run build --workspace @leadfinder/web`, output `apps/web/.next`).
-- **Worker**: any always-on Node ≥ 20 host (Railway/Render/Fly/VM):
-  `npm ci && npm run start --workspace @leadfinder/worker`. 512 MB is ample at
-  the 10k-records/month target. Scale by adding instances — the queue is
-  SKIP LOCKED-safe.
+- **Background jobs — two interchangeable options (same engine):**
+  1. **Serverless (default, no extra host):** the `/api/cron/worker` route runs
+     the job engine on a bounded per-invocation budget. Trigger it every minute.
+     On Vercel **Pro**, use native cron (`vercel.json` → `* * * * *`). On
+     **Hobby** (native cron is daily-only, functions cap ~10s), trigger it from
+     **Supabase pg_cron + pg_net** instead: `npm run cron:setup --workspace
+     @leadfinder/db` (reads `CRON_SECRET` + `CRON_TARGET_URL`). `vercel.json`
+     keeps a daily cron as a backstop.
+  2. **Standalone worker (for heavy/low-latency loads):** any always-on Node ≥ 20
+     host, `npm run start --workspace @leadfinder/worker`. Same engine, continuous.
+     Both are safe together — the queue is SKIP-LOCKED and idempotent.
 - **Database/Auth**: Supabase production project (Pro tier for PITR backups).
-- **Export storage**: production must use private object storage (Supabase
-  Storage bucket, private) — the local-disk mode is development-only. This is
-  a pre-launch task tracked in RELEASE_CHECKLIST.
+  **Serverless DB connection MUST use the transaction pooler** (IPv4):
+  `postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:6543/postgres`.
+  The direct `db.<ref>.supabase.co:5432` host is IPv6-only and unreachable from
+  Vercel serverless (ENOTFOUND). Migrations from a machine with IPv6 may keep
+  the direct URL.
+- **Export storage**: Supabase Storage private bucket `exports` (auto-created).
+  Files are served only via 60-second signed URLs. No local disk in production.
+- **CRON_SECRET**: gates `/api/cron/worker` (Bearer). Required in production.
 
 ## Environment variables
 

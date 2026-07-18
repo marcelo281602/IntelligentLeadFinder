@@ -82,3 +82,13 @@ Update this file whenever a durable decision is made.
 | Delivery SSRF guard: HTTPS only, loopback/private ranges refused, redirects refused, 20s timeout. fetch failures surface `.cause.code` (ENOTFOUND etc.), not just "TypeError". |
 | Live E2E verified on hosted Supabase: 9 fixture leads → postman-echo (httpbin.org DNS is blocked in this sandbox), deliveries=9, re-sync appended 0 (idempotent). Test destination soft-deleted after. |
 | Client deliverables in `deliverables/`: LeadFinder-Client-Handoff.pdf (4pp: access, workflow, Apify BYO-key, cost controls, Sheets setup, trial) and LeadFinder-vs-Apify-Why-It-Wins.pdf (3pp: engine-vs-car positioning, side-by-side table, 5 value props). Branded reportlab, entity-render verified. |
+
+## 2026-07-18 (Vercel Cron serverless — no separate worker host)
+
+| Decision |
+| --- |
+| Worker engine extracted to `@leadfinder/worker/engine` (dispatch/processQueueTick/runMaintenance), imported by BOTH the standalone worker (main.ts, now a thin loop) and a new `/api/cron/worker` Next route. Works because the queue is SKIP-LOCKED + every stage idempotent/checkpointed — cadence is the only difference. |
+| Exports moved off local disk → Supabase Storage private bucket `exports` (survives serverless; local disk is per-invocation ephemeral). Download route redirects to a 60s signed URL; retention purges from Storage; bucket auto-created lazily. |
+| Vercel account is HOBBY: native cron limited to once/day + functions cap ~10s. So: vercel.json cron = daily backstop only; the real per-minute trigger is **Supabase pg_cron + pg_net** pinging the endpoint 2×/min (free, self-contained, no Pro plan, no Railway). Endpoint gated by CRON_SECRET (Bearer), tick budget 8s to fit the 10s cap. `npm run cron:setup --workspace @leadfinder/db` installs it (reads CRON_SECRET + CRON_TARGET_URL from env; secret never committed). |
+| CRITICAL serverless fix: Supabase DIRECT connection (`db.<ref>.supabase.co:5432`) is IPv6-only → Vercel serverless (IPv4) gets ENOTFOUND. Vercel `DATABASE_URL` must use the TRANSACTION POOLER: `postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:6543/postgres`. This project's region = **ap-southeast-2** (found by probing). Local .env keeps the direct URL for migrations (Mac has IPv6). |
+| Verified: cron endpoint 401s without secret, processes with it (`{ok:true,processed:N}`); Mac worker OFF; pg_cron drives a full fixture run to completion via Vercel alone. |
