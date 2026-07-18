@@ -1,4 +1,6 @@
 import { hasPermission } from '@leadfinder/core';
+import Link from 'next/link';
+import { APPROVED_YELP_ACTOR_ID } from '@leadfinder/core';
 import { ProspeoEnrichmentAdapter } from '@leadfinder/providers';
 import {
   connectApify,
@@ -8,6 +10,7 @@ import {
   rotateCredential,
   testConnection,
 } from '@/actions/integrations';
+import { connectYelpApify } from '@/actions/yelp';
 import { requireOrg } from '@/lib/auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { formatDateTime } from '@/lib/format';
@@ -63,6 +66,8 @@ export default async function IntegrationsPage({
   const outscraperEnabled = flagEnabled('provider_outscraper');
   const prospeoConnections = (connections ?? []).filter((c) => c.provider === 'prospeo');
   const prospeoEnabled = flagEnabled('provider_prospeo');
+  const yelpConnections = (connections ?? []).filter((c) => c.provider === 'yelp_apify');
+  const yelpEnabled = flagEnabled('provider_yelp_apify');
   const prospeoNotes = new ProspeoEnrichmentAdapter().capabilities().notes;
   const fixtureConnection = (connections ?? []).find((c) => c.provider === 'fixture');
 
@@ -87,7 +92,9 @@ export default async function IntegrationsPage({
             ? 'Outscraper'
             : params.connected === 'prospeo'
               ? 'Prospeo'
-              : 'Apify'}{' '}
+              : params.connected === 'yelp'
+                ? 'Yelp via Apify'
+                : 'Apify'}{' '}
           connected and verified.
         </p>
       ) : null}
@@ -455,6 +462,162 @@ export default async function IntegrationsPage({
             <p className="text-xs text-ink-faint">
               Collects business data only — pair with Apify Business Leads for decision-maker
               contacts. First 500 places each month are free on Outscraper&apos;s side.
+            </p>
+          </div>
+        </Card>
+      ) : null}
+
+      {/* Yelp via Apify — a SEPARATE integration record and secret from the
+          Apify Google Maps card above. Disconnecting it never touches the
+          Google Maps, Outscraper, or Prospeo connections. */}
+      {yelpEnabled ? (
+        <Card className="rise rise-2">
+          <CardHeader
+            overline={`Powers the Yelp Leads Scraper tab · approved Actor ${APPROVED_YELP_ACTOR_ID} · pricing verified 2026-07-18`}
+            title="Yelp via Apify"
+            action={
+              yelpConnections.length > 0 ? (
+                <Badge tone="ok">Connected</Badge>
+              ) : (
+                <Badge tone="neutral">Not connected</Badge>
+              )
+            }
+          />
+          <div className="space-y-4 p-5">
+            {yelpConnections.map((conn) => (
+              <div key={conn.id} className="rounded-md border border-line bg-raised p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium">
+                      {conn.label}
+                      <span className="ml-2 text-xs text-ink-faint">
+                        {APPROVED_YELP_ACTOR_ID} · pay-per-event
+                        {conn.secret_fingerprint ? (
+                          <>
+                            {' '}
+                            · fp <code className="mono">{conn.secret_fingerprint}</code>
+                          </>
+                        ) : null}
+                      </span>
+                    </p>
+                    <p className="text-xs text-ink-faint">
+                      {conn.last_test_ok ? 'Healthy' : (conn.last_error ?? 'Untested')} · last
+                      tested {formatDateTime(conn.last_test_at)}
+                      {conn.last_used_at ? ` · last used ${formatDateTime(conn.last_used_at)}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      tone={
+                        conn.status === 'connected'
+                          ? 'ok'
+                          : conn.status === 'error'
+                            ? 'danger'
+                            : 'neutral'
+                      }
+                    >
+                      {conn.status}
+                    </Badge>
+                    <form action={testConnection}>
+                      <input type="hidden" name="connectionId" value={conn.id} />
+                      <Button variant="secondary" type="submit">
+                        Test token &amp; Actor access
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+                {canManage && conn.status !== 'disconnected' ? (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-sm text-primary select-none">
+                      Rotate credential or disconnect Yelp only
+                    </summary>
+                    <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                      <form
+                        action={rotateCredential}
+                        className="space-y-2 rounded-md border border-line p-3"
+                      >
+                        <input type="hidden" name="connectionId" value={conn.id} />
+                        <p className="text-sm font-medium">Rotate Apify API token</p>
+                        <Input
+                          name="token"
+                          type="password"
+                          placeholder="New Apify API token"
+                          autoComplete="off"
+                          required
+                        />
+                        <Input
+                          name="confirmPassword"
+                          type="password"
+                          placeholder="Your account password"
+                          autoComplete="current-password"
+                          required
+                        />
+                        <Button variant="secondary" type="submit">
+                          Rotate
+                        </Button>
+                      </form>
+                      <form
+                        action={disconnectConnection}
+                        className="space-y-2 rounded-md border border-line p-3"
+                      >
+                        <input type="hidden" name="connectionId" value={conn.id} />
+                        <p className="text-sm font-medium">Disconnect Yelp only</p>
+                        <p className="text-xs text-ink-faint">
+                          Blocks new Yelp runs. Does not touch the Apify Google Maps, Outscraper,
+                          or Prospeo connections; Yelp run history and provenance are kept.
+                        </p>
+                        <Input
+                          name="confirmPassword"
+                          type="password"
+                          placeholder="Your account password"
+                          autoComplete="current-password"
+                          required
+                        />
+                        <Button variant="danger" type="submit">
+                          Disconnect
+                        </Button>
+                      </form>
+                    </div>
+                  </details>
+                ) : null}
+              </div>
+            ))}
+
+            {canManage ? (
+              <details open={yelpConnections.length === 0}>
+                <summary className="cursor-pointer text-sm font-medium text-primary select-none">
+                  {yelpConnections.length === 0
+                    ? 'Connect Yelp via Apify'
+                    : 'Add another Yelp connection'}
+                </summary>
+                <form action={connectYelpApify} className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="Apify API token"
+                    htmlFor="yelp-token"
+                    hint="An Apify token — not a Yelp login or Yelp API key. Stored under its own encrypted secret, separate from the Google Maps card, even if you paste the same token."
+                  >
+                    <Input id="yelp-token" name="token" type="password" autoComplete="off" required />
+                  </Field>
+                  <Field label="Label" htmlFor="yelp-label">
+                    <Input id="yelp-label" name="label" defaultValue="Default" />
+                  </Field>
+                  <div className="sm:col-span-2">
+                    <Button type="submit">Test &amp; connect</Button>
+                  </div>
+                </form>
+              </details>
+            ) : (
+              <p className="text-xs text-ink-faint">
+                Only owners and admins can manage provider credentials.
+              </p>
+            )}
+            <p className="text-xs text-ink-faint">
+              The Actor is fixed to {APPROVED_YELP_ACTOR_ID} by the platform — arbitrary Actor IDs
+              are not accepted. Website-email enrichment stays disabled until its event price is
+              verified.{' '}
+              <Link href="/yelp-leads" className="text-primary hover:underline">
+                Open the Yelp Leads Scraper →
+              </Link>
             </p>
           </div>
         </Card>

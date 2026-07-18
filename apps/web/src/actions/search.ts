@@ -222,8 +222,13 @@ export async function confirmRun(formData: FormData): Promise<void> {
   const callbackToken = generateToken(32);
   const callbackTokenHash = createHash('sha256').update(callbackToken).digest('hex');
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  // Both Apify-platform providers use the same callback inbox; the run row
+  // already pins the exact connection, so a Yelp callback can never resolve
+  // the Google Maps connection (and vice versa).
   const callbackUrl =
-    run.provider === 'apify' ? `${appUrl}/api/webhooks/apify/${callbackToken}` : null;
+    run.provider === 'apify' || run.provider === 'yelp_apify'
+      ? `${appUrl}/api/webhooks/apify/${callbackToken}`
+      : null;
 
   // Guarded transition: only one confirm can win this update.
   const service = createServiceClient();

@@ -182,6 +182,80 @@ export function estimateRunCost(input: EstimateInput, card: RateCard): CostEstim
   };
 }
 
+export interface YelpEstimateInput {
+  /** Requested maximum business results (the maxItems cap sent to the Actor). */
+  maxResults: number;
+  scrapeReviews: boolean;
+  maxReviewsPerBusiness: number;
+}
+
+/**
+ * Yelp-via-Apify estimator (memo23/yelp-scraper pay-per-event pricing):
+ * emitted business results + one Actor start + optional review details.
+ * Email enrichment is never estimated — its event price is unpublished, and
+ * the option stays disabled until an admin verifies a rate.
+ */
+export function estimateYelpRunCost(input: YelpEstimateInput, card: RateCard): CostEstimate {
+  if (!Number.isInteger(input.maxResults) || input.maxResults <= 0) {
+    throw new Error('maxResults must be a positive integer');
+  }
+  const a = card.assumptions;
+
+  const results = {
+    low: Math.max(1, Math.round(input.maxResults * a.placeFillRate.low)),
+    expected: Math.max(1, Math.round(input.maxResults * a.placeFillRate.expected)),
+    high: Math.round(input.maxResults * a.placeFillRate.high),
+  };
+
+  const lines: EstimateLine[] = [];
+  const push = (
+    eventKey: string,
+    label: string,
+    units: { low: number; expected: number; high: number },
+  ) => {
+    const per = rate(card, eventKey);
+    if (per === 0 && units.expected === 0) return;
+    lines.push({
+      eventKey,
+      label,
+      expectedUnits: units.expected,
+      perUnitMicroUsd: per,
+      low: per * units.low,
+      expected: per * units.expected,
+      high: per * units.high,
+    });
+  };
+
+  push('business_result', 'Yelp business results', results);
+  push('actor_start', 'Actor start', { low: 1, expected: 1, high: 1 });
+
+  if (input.scrapeReviews && input.maxReviewsPerBusiness > 0) {
+    push('review_detail', `Review details (${input.maxReviewsPerBusiness}/business)`, {
+      low: results.low * input.maxReviewsPerBusiness,
+      expected: results.expected * input.maxReviewsPerBusiness,
+      high: results.high * input.maxReviewsPerBusiness,
+    });
+  }
+
+  const totalLow = lines.reduce((sum, l) => sum + l.low, 0);
+  const totalExpected = lines.reduce((sum, l) => sum + l.expected, 0);
+  const totalHigh = lines.reduce((sum, l) => sum + l.high, 0);
+
+  return {
+    currency: 'USD',
+    rateCardVersion: card.version,
+    rateCardLastVerifiedAt: card.lastVerifiedAt,
+    lines,
+    totalLow,
+    totalExpected,
+    totalHigh,
+    recommendedCapMicroUsd: ceilToCents(Math.round(totalHigh * 1.15)),
+    assumptions: a,
+    estimatedCompanies: results,
+    estimatedContacts: { low: 0, expected: 0, high: 0 },
+  };
+}
+
 /**
  * Validate a user-chosen hard cap against the estimate and org entitlements.
  * Users may lower the cap, never raise it beyond the entitlement ceiling.

@@ -139,6 +139,36 @@ export function outscraperMapsRateCard(): RateCard {
   };
 }
 
+export const APPROVED_YELP_ACTOR_ID = 'memo23/yelp-scraper';
+
+/**
+ * Yelp-via-Apify Actor rate card (pay-per-event, flat across Apify plans).
+ * Verified 2026-07-18 from the Actor pricing page: $2.75/1k business results,
+ * $1.50/1k review details, $0.009 per Actor start, $20/1k review-insights,
+ * $50/1k AI analysis. The optional email-enrichment event has NO published
+ * price, so it is deliberately absent — the option stays disabled until an
+ * admin verifies and publishes a rate (never estimate against a guess).
+ */
+export function yelpApifyRateCard(): RateCard {
+  return {
+    provider: 'yelp_apify',
+    scope: APPROVED_YELP_ACTOR_ID,
+    planTier: 'pay_per_event',
+    currency: 'USD',
+    version: 1,
+    lastVerifiedAt: '2026-07-18',
+    sourceUrl: 'https://apify.com/memo23/yelp-scraper/pricing',
+    events: {
+      business_result: usdToMicro(2.75 / 1000),
+      review_detail: usdToMicro(1.5 / 1000),
+      actor_start: usdToMicro(0.009),
+      review_insights: usdToMicro(20 / 1000),
+      ai_analysis: usdToMicro(50 / 1000),
+    },
+    assumptions: DEFAULT_ASSUMPTIONS,
+  };
+}
+
 export type ProspeoPlanTier = 'free' | 'basic' | 'pro' | 'business' | 'corporate';
 
 /**

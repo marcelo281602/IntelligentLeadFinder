@@ -60,6 +60,19 @@ export const decisionMakerConfigSchema = z.object({
 });
 export type DecisionMakerConfig = z.infer<typeof decisionMakerConfigSchema>;
 
+/**
+ * Yelp-specific options (only meaningful on yelp_apify runs). Email
+ * enrichment is intentionally absent: the Actor's live rate card publishes no
+ * per-email price, and we never bill against a guessed rate.
+ */
+export const yelpOptionsSchema = z.object({
+  /** Visit each business profile for complete data (hours, website, …). */
+  fetchBusinessDetails: z.boolean().default(true),
+  scrapeReviews: z.boolean().default(false),
+  maxReviewsPerBusiness: z.number().int().min(1).max(100).default(10),
+});
+export type YelpOptions = z.infer<typeof yelpOptionsSchema>;
+
 export const searchConfigSchema = z.object({
   name: z.string().trim().min(1, 'Search name is required').max(200),
   searchTerm: z.string().trim().min(1, 'Industry or search term is required').max(200),
@@ -72,6 +85,7 @@ export const searchConfigSchema = z.object({
   decisionMakers: decisionMakerConfigSchema.default({}),
   reviewsPerPlace: z.number().int().min(0).max(100).default(0),
   imagesPerPlace: z.number().int().min(0).max(20).default(0),
+  yelp: yelpOptionsSchema.optional(),
 });
 export type SearchConfig = z.infer<typeof searchConfigSchema>;
 

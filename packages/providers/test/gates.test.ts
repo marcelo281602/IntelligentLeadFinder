@@ -37,10 +37,18 @@ describe('adapter registries stay honest', () => {
     expect(() => getMapsAdapter('prospeo')).toThrow(ProviderError);
   });
 
-  it('Maps registry returns working adapters for apify, fixture, and outscraper', () => {
+  it('Maps registry returns working adapters for apify, yelp_apify, fixture, and outscraper', () => {
     expect(getMapsAdapter('apify').provider).toBe('apify');
+    expect(getMapsAdapter('yelp_apify').provider).toBe('yelp_apify');
     expect(getMapsAdapter('fixture').provider).toBe('fixture');
     expect(getMapsAdapter('outscraper').provider).toBe('outscraper');
+  });
+
+  it('yelp_apify is a distinct integration identity from apify', () => {
+    // Separate adapter identity → separate connections, rate cards, and
+    // usage rows. The Yelp path can never resolve the Google Maps adapter.
+    expect(getMapsAdapter('yelp_apify').defaultSourceId).toBe('memo23/yelp-scraper');
+    expect(getMapsAdapter('apify').defaultSourceId).not.toBe('memo23/yelp-scraper');
   });
 
   it('enrichment registry returns prospeo, keeps apollo gated, refuses Maps providers', () => {

@@ -13,14 +13,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const orgs = await listMyOrganizations();
 
   const supabase = await createSupabaseServerClient();
-  const [{ count: unread }, { data: orgPlan }] = await Promise.all([
+  const [{ count: unread }, { data: orgPlan }, { data: yelpFlag }] = await Promise.all([
     supabase
       .from('notifications')
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', ctx.orgId)
       .is('read_at', null),
     supabase.from('organizations').select('plan, trial_ends_at').eq('id', ctx.orgId).maybeSingle(),
+    supabase
+      .from('feature_flags')
+      .select('enabled')
+      .eq('key', 'provider_yelp_apify')
+      .is('organization_id', null)
+      .maybeSingle(),
   ]);
+  const showYelp = yelpFlag?.enabled ?? false;
 
   const trialDaysLeft =
     orgPlan?.plan === 'trial'
@@ -39,7 +46,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         >
           {brand.name}
         </Link>
-        <NavLinks />
+        <NavLinks showYelp={showYelp} />
         {ctx.isSuperAdmin ? (
           <Link
             href="/admin"
@@ -60,7 +67,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {/* Top bar */}
         <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-line bg-surface/90 px-4 py-3 backdrop-blur-sm lg:px-8">
           <div className="flex items-center gap-3">
-            <MobileNav />
+            <MobileNav showYelp={showYelp} />
             {orgs.length > 1 ? (
               <form action={switchOrganization}>
                 <select

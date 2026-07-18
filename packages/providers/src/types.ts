@@ -91,6 +91,9 @@ export interface MappedCompany {
   googleMapsUrl: string | null;
   googleFid: string | null;
   googleCid: string | null;
+  /** Yelp source namespace — set only by the Yelp-via-Apify adapter. */
+  yelpBusinessId?: string | null;
+  yelpUrl?: string | null;
   rating: number | null;
   reviewCount: number | null;
   permanentlyClosed: boolean;
@@ -162,6 +165,12 @@ export interface MapsProviderAdapter {
 export interface MapContext {
   /** Whether the confirmed run requested decisive email verification. */
   verificationRequested: boolean;
+  /**
+   * ISO-3166 alpha-2 from the confirmed search location. Yelp results carry
+   * no country field, so it may be derived safely from the requested
+   * location (never guessed from other fields).
+   */
+  defaultCountryCode?: string | null;
 }
 
 /**

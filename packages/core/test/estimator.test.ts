@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { estimateRunCost, validateHardCap, type EstimateInput } from '../src/estimator';
-import { apifyGoogleMapsRateCard, fixtureRateCard } from '../src/rate-cards';
+import { estimateRunCost, estimateYelpRunCost, validateHardCap, type EstimateInput } from '../src/estimator';
+import { apifyGoogleMapsRateCard, fixtureRateCard, yelpApifyRateCard } from '../src/rate-cards';
 import { usdToMicro } from '../src/types';
 
 const baseInput: EstimateInput = {
@@ -116,5 +116,53 @@ describe('validateHardCap', () => {
       orgRemainingMonthlyBudgetMicroUsd: usdToMicro(10),
     });
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('estimateYelpRunCost (memo23/yelp-scraper pay-per-event)', () => {
+  const card = yelpApifyRateCard();
+
+  it('models business results plus one Actor start', () => {
+    const estimate = estimateYelpRunCost(
+      { maxResults: 1000, scrapeReviews: false, maxReviewsPerBusiness: 10 },
+      card,
+    );
+    // 1,000 results × $2.75/1k + $0.009 start ≈ $2.759 at the high scenario.
+    expect(estimate.totalHigh).toBe(1000 * 2750 + 9000);
+    expect(estimate.lines.map((l) => l.eventKey)).toEqual(['business_result', 'actor_start']);
+    expect(estimate.estimatedContacts.expected).toBe(0);
+    expect(estimate.recommendedCapMicroUsd).toBeGreaterThanOrEqual(estimate.totalHigh);
+  });
+
+  it('adds review details only when reviews are enabled', () => {
+    const withReviews = estimateYelpRunCost(
+      { maxResults: 100, scrapeReviews: true, maxReviewsPerBusiness: 10 },
+      card,
+    );
+    expect(withReviews.lines.some((l) => l.eventKey === 'review_detail')).toBe(true);
+    const without = estimateYelpRunCost(
+      { maxResults: 100, scrapeReviews: false, maxReviewsPerBusiness: 10 },
+      card,
+    );
+    expect(without.lines.some((l) => l.eventKey === 'review_detail')).toBe(false);
+  });
+
+  it('never bills email enrichment — the event has no published price', () => {
+    expect(card.events.email_enrichment).toBeUndefined();
+    const estimate = estimateYelpRunCost(
+      { maxResults: 100, scrapeReviews: false, maxReviewsPerBusiness: 10 },
+      card,
+    );
+    expect(estimate.lines.every((l) => l.eventKey !== 'email_enrichment')).toBe(true);
+  });
+
+  it('low/expected scenarios respect the fill-rate assumptions', () => {
+    const estimate = estimateYelpRunCost(
+      { maxResults: 200, scrapeReviews: false, maxReviewsPerBusiness: 10 },
+      card,
+    );
+    expect(estimate.estimatedCompanies.low).toBe(100); // 0.5 fill
+    expect(estimate.estimatedCompanies.expected).toBe(170); // 0.85 fill
+    expect(estimate.totalLow).toBeLessThan(estimate.totalExpected);
   });
 });

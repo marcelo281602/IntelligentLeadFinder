@@ -12,6 +12,7 @@ import {
   ScrollText,
   Search,
   Settings,
+  Store,
   Users,
   UserSearch,
   Wallet,
@@ -21,6 +22,9 @@ import { cx } from './ui';
 const NAV_ITEMS = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/lead-finder', label: 'Lead Finder', icon: Search },
+  // Shown only while the provider_yelp_apify feature flag is on (the layout
+  // passes the flag state; flipping the flag off is the Yelp kill switch).
+  { href: '/yelp-leads', label: 'Yelp Leads Scraper', icon: Store, flag: 'yelp' },
   { href: '/runs', label: 'Search Runs', icon: Activity },
   { href: '/companies', label: 'Companies', icon: Building2 },
   { href: '/contacts', label: 'Decision Makers', icon: UserSearch },
@@ -33,11 +37,18 @@ const NAV_ITEMS = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;
 
-export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+export function NavLinks({
+  onNavigate,
+  showYelp = false,
+}: {
+  onNavigate?: () => void;
+  showYelp?: boolean;
+}) {
   const pathname = usePathname();
+  const items = NAV_ITEMS.filter((item) => !('flag' in item) || item.flag !== 'yelp' || showYelp);
   return (
     <nav aria-label="Primary" className="flex flex-col gap-0.5">
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+      {items.map(({ href, label, icon: Icon }) => {
         const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
         return (
           <Link
@@ -66,7 +77,7 @@ export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function MobileNav() {
+export function MobileNav({ showYelp = false }: { showYelp?: boolean }) {
   return (
     <details className="group relative lg:hidden">
       <summary
@@ -81,7 +92,7 @@ export function MobileNav() {
         Menu
       </summary>
       <div className="absolute left-0 z-50 mt-2 w-64 rounded-(--radius-card) border border-line bg-surface p-2 shadow-(--shadow-float)">
-        <NavLinks />
+        <NavLinks showYelp={showYelp} />
       </div>
     </details>
   );

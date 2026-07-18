@@ -53,11 +53,21 @@ export const LEAD_STATUSES = [
 ] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
-export const PROVIDER_KINDS = ['apify', 'outscraper', 'apollo', 'prospeo', 'fixture'] as const;
+export const PROVIDER_KINDS = [
+  'apify',
+  'yelp_apify',
+  'outscraper',
+  'apollo',
+  'prospeo',
+  'fixture',
+] as const;
 export type ProviderKind = (typeof PROVIDER_KINDS)[number];
 
 export const PROVIDER_CATEGORY = {
   apify: 'data_source',
+  // Separate Yelp-via-Apify integration: its own connections, secrets, rate
+  // cards, and runs. Same Apify platform, never the same connection record.
+  yelp_apify: 'data_source',
   outscraper: 'data_source',
   apollo: 'enrichment',
   prospeo: 'enrichment',

@@ -60,6 +60,7 @@ export async function handleNormalize(db: Db, job: Job): Promise<void> {
     for (const raw of rows) {
       const mapped = adapter.mapItem(raw.payload, {
         verificationRequested: config.decisionMakers.verifyWorkEmail,
+        defaultCountryCode: config.locations[0]?.countryCode ?? null,
       });
       if (!mapped) {
         await bumpCounts(db, run.id, { rejected_count: 1 });
@@ -212,7 +213,10 @@ async function upsertCompany(
 
   const keys = companyDedupeKeys({
     provider: run.provider,
-    providerPlaceId: company.googlePlaceId,
+    // Provider record ids stay in their own source namespace: the key is
+    // place:<provider>:<id>, so a Yelp business id can never collide with a
+    // Google place id.
+    providerPlaceId: company.googlePlaceId ?? company.yelpBusinessId ?? null,
     website: company.website,
     phone: company.primaryPhone,
     countryCode: company.countryCode,
@@ -251,6 +255,8 @@ async function upsertCompany(
          rating = coalesce(rating, $8),
          review_count = coalesce(review_count, $9),
          full_address = coalesce(full_address, $10),
+         yelp_business_id = coalesce(yelp_business_id, $11),
+         yelp_url = coalesce(yelp_url, $12),
          source_freshness = greatest(coalesce(source_freshness, 'epoch'::timestamptz), now())
        where id = $1`,
       [
@@ -264,6 +270,8 @@ async function upsertCompany(
         company.rating,
         company.reviewCount,
         company.fullAddress,
+        company.yelpBusinessId ?? null,
+        company.yelpUrl ?? null,
       ],
     );
     await bumpCounts(db, run.id, { duplicate_count: 1 });
@@ -275,9 +283,9 @@ async function upsertCompany(
           description, website, root_domain, primary_email, primary_phone, primary_phone_e164,
           company_linkedin_url, social_profiles, full_address, street, neighborhood, city, region,
           postal_code, country_code, latitude, longitude, google_place_id, google_maps_url,
-          google_fid, google_cid, rating, review_count, business_status, price_range, opening_hours,
-          source_freshness, is_fixture)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,now(),$33)
+          google_fid, google_cid, yelp_business_id, yelp_url, rating, review_count,
+          business_status, price_range, opening_hours, source_freshness, is_fixture)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,now(),$35)
        on conflict (organization_id, google_place_id) where google_place_id is not null and deleted_at is null
        do update set updated_at = now()
        returning id`,
@@ -309,6 +317,8 @@ async function upsertCompany(
         company.googleMapsUrl,
         company.googleFid,
         company.googleCid,
+        company.yelpBusinessId ?? null,
+        company.yelpUrl ?? null,
         company.rating,
         company.reviewCount,
         company.permanentlyClosed

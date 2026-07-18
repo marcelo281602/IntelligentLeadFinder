@@ -2,6 +2,7 @@ import 'server-only';
 import {
   countBillableFilters,
   estimateRunCost,
+  estimateYelpRunCost,
   fixtureRateCard,
   type CostEstimate,
   type RateCard,
@@ -19,6 +20,10 @@ export function rateCardKeyFor(
 ): { scope: string; planTier: string } {
   if (provider === 'outscraper') {
     return { scope: 'google-maps', planTier: 'pay_as_you_go' };
+  }
+  if (provider === 'yelp_apify') {
+    // The approved Yelp Actor is priced flat pay-per-event across Apify plans.
+    return { scope: 'memo23/yelp-scraper', planTier: 'pay_per_event' };
   }
   return {
     scope: config.actorId ?? 'compass/crawler-google-places',
@@ -71,7 +76,27 @@ export async function loadRateCard(
   };
 }
 
+/** Provider-aware estimate dispatch: Yelp uses its own pay-per-event model. */
 export function estimateForConfig(config: SearchConfig, card: RateCard): CostEstimate {
+  if (card.provider === 'yelp_apify') {
+    const yelp = config.yelp ?? {
+      fetchBusinessDetails: true,
+      scrapeReviews: false,
+      maxReviewsPerBusiness: 10,
+    };
+    return estimateYelpRunCost(
+      {
+        maxResults: config.maxResults,
+        scrapeReviews: yelp.scrapeReviews,
+        maxReviewsPerBusiness: yelp.maxReviewsPerBusiness,
+      },
+      card,
+    );
+  }
+  return estimateForGoogleMaps(config, card);
+}
+
+function estimateForGoogleMaps(config: SearchConfig, card: RateCard): CostEstimate {
   return estimateRunCost(
     {
       maxResults: config.maxResults,

@@ -3,6 +3,7 @@ import { ApifyGoogleMapsAdapter } from './apify/adapter';
 import { FixtureMapsAdapter } from './fixture/adapter';
 import { OutscraperMapsAdapter } from './outscraper/adapter';
 import { ProspeoEnrichmentAdapter } from './prospeo/adapter';
+import { YelpApifyAdapter } from './yelp/adapter';
 import {
   ProviderError,
   type ContactEnrichmentAdapter,
@@ -41,6 +42,9 @@ export {
   mapProspeoPerson,
 } from './prospeo/adapter';
 export { ProspeoClient } from './prospeo/client';
+export { YelpApifyAdapter, buildYelpActorInput, mapYelpBusiness } from './yelp/adapter';
+export { buildYelpSearchUrl, assertApprovedYelpUrl } from './yelp/url';
+export { yelpBusinessSchema, type YelpActorInput, type YelpBusiness } from './yelp/schemas';
 export { apolloCapabilities, assertApolloAllowed, type ApolloGateInput } from './stubs';
 
 /** Resolve the contact-enrichment adapter for a provider kind. */
@@ -68,6 +72,8 @@ export function getMapsAdapter(provider: ProviderKind): MapsProviderAdapter {
   switch (provider) {
     case 'apify':
       return new ApifyGoogleMapsAdapter();
+    case 'yelp_apify':
+      return new YelpApifyAdapter();
     case 'fixture':
       return new FixtureMapsAdapter();
     case 'outscraper':

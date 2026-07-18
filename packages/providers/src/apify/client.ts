@@ -98,6 +98,17 @@ export class ApifyClient {
   }
 
   /**
+   * GET /acts/{actorId} — verifies the token can access an Actor. Used by the
+   * Yelp connection test to prove access to the approved Actor independently
+   * of any other connection. Free; never starts a run.
+   */
+  async getActor(actorId: string): Promise<unknown> {
+    const actorPath = actorId.replace('/', '~');
+    const { json } = await this.request('GET', `/acts/${actorPath}`);
+    return (json as { data?: unknown })?.data ?? json;
+  }
+
+  /**
    * POST /acts/{actorId}/runs — start an Actor run asynchronously.
    * maxTotalChargeUsd is the provider-enforced hard cost cap.
    */
