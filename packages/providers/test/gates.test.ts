@@ -3,7 +3,6 @@ import { getMapsAdapter } from '../src/index';
 import {
   apolloCapabilities,
   assertApolloAllowed,
-  outscraperCapabilities,
   prospeoCapabilities,
 } from '../src/stubs';
 import { ProviderError } from '../src/types';
@@ -35,19 +34,20 @@ describe('Apollo commercial-use gate', () => {
 });
 
 describe('unimplemented providers stay honest', () => {
-  it('outscraper and prospeo manifests declare no capabilities', () => {
-    expect(outscraperCapabilities().companyCollection).toBe(false);
+  it('prospeo manifest declares no capabilities', () => {
     expect(prospeoCapabilities().emailVerification).toBe(false);
   });
 
-  it('adapter registry refuses gated providers', () => {
-    expect(() => getMapsAdapter('outscraper')).toThrow(ProviderError);
+  it('adapter registry refuses non-Maps enrichment providers', () => {
+    // Apollo and Prospeo are contact-enrichment providers, not Maps data
+    // sources, so the Maps registry refuses them.
     expect(() => getMapsAdapter('apollo')).toThrow(ProviderError);
     expect(() => getMapsAdapter('prospeo')).toThrow(ProviderError);
   });
 
-  it('registry returns working adapters for apify and fixture', () => {
+  it('registry returns working adapters for apify, fixture, and outscraper', () => {
     expect(getMapsAdapter('apify').provider).toBe('apify');
     expect(getMapsAdapter('fixture').provider).toBe('fixture');
+    expect(getMapsAdapter('outscraper').provider).toBe('outscraper');
   });
 });

@@ -10,6 +10,23 @@ import {
 import { createSupabaseServerClient } from './supabase/server';
 
 /**
+ * Resolve the rate-card lookup key for a connection. Apify cards are scoped
+ * per actor + plan tier; Outscraper has one flat pay-as-you-go card.
+ */
+export function rateCardKeyFor(
+  provider: string,
+  config: { actorId?: string; planTier?: string },
+): { scope: string; planTier: string } {
+  if (provider === 'outscraper') {
+    return { scope: 'google-maps', planTier: 'pay_as_you_go' };
+  }
+  return {
+    scope: config.actorId ?? 'compass/crawler-google-places',
+    planTier: config.planTier ?? 'starter',
+  };
+}
+
+/**
  * Load the active versioned rate card for a provider connection and compute
  * the low/expected/high estimate. Rate cards live in the database so admins
  * can publish new versions; the card version is stored with the run.

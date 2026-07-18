@@ -12,6 +12,7 @@ export interface RunRow {
   connection_id: string | null;
   provider_run_id: string | null;
   provider_dataset_id: string | null;
+  rate_card_id: string | null;
   hard_cap_micro_usd: string | number | null;
   estimate_expected_micro_usd: string | number | null;
   checkpoint: Record<string, unknown>;

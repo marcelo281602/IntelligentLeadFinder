@@ -1,6 +1,7 @@
 import type { ProviderKind } from '@leadfinder/core';
 import { ApifyGoogleMapsAdapter } from './apify/adapter';
 import { FixtureMapsAdapter } from './fixture/adapter';
+import { OutscraperMapsAdapter } from './outscraper/adapter';
 import { ProviderError, type MapsProviderAdapter } from './types';
 
 export * from './types';
@@ -24,9 +25,14 @@ export {
 export { FixtureMapsAdapter } from './fixture/adapter';
 export { FIXTURE_PLACES } from './fixture/data';
 export {
+  OutscraperMapsAdapter,
+  buildOutscraperPayload,
+  mapOutscraperPlace,
+} from './outscraper/adapter';
+export { OutscraperClient } from './outscraper/client';
+export {
   apolloCapabilities,
   assertApolloAllowed,
-  outscraperCapabilities,
   prospeoCapabilities,
   type ApolloGateInput,
 } from './stubs';
@@ -39,7 +45,7 @@ export function getMapsAdapter(provider: ProviderKind): MapsProviderAdapter {
     case 'fixture':
       return new FixtureMapsAdapter();
     case 'outscraper':
-      throw new ProviderError('Outscraper adapter is not yet implemented.', 'feature_gated', false);
+      return new OutscraperMapsAdapter();
     case 'apollo':
       throw new ProviderError(
         'Apollo is not a Maps data source and is commercially gated.',

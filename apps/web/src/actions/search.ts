@@ -15,7 +15,7 @@ import {
 import { generateToken } from '@leadfinder/security';
 import { audit } from '@/lib/audit';
 import { requirePermission } from '@/lib/auth';
-import { estimateForConfig, getBudgetStatus, loadRateCard } from '@/lib/estimate';
+import { estimateForConfig, getBudgetStatus, loadRateCard, rateCardKeyFor } from '@/lib/estimate';
 import { enqueueJob } from '@/lib/jobs';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -75,8 +75,7 @@ export async function createDraftAndEstimate(formData: FormData): Promise<void> 
   }
 
   const connConfig = (connection.config ?? {}) as { actorId?: string; planTier?: string };
-  const scope = connConfig.actorId ?? 'compass/crawler-google-places';
-  const planTier = connConfig.planTier ?? 'starter';
+  const { scope, planTier } = rateCardKeyFor(connection.provider, connConfig);
 
   let estimate;
   let rateCardId: string | null = null;

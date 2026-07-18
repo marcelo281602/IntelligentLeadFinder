@@ -22,11 +22,15 @@ export async function handleReconcile(db: Db, job: Job, masterKey: string): Prom
 
   // Fetch authoritative usage after provider totals stabilize.
   let actualMicroUsd = 0;
+  let providerReported = false;
   try {
     const adapter = getMapsAdapter(run.provider as ProviderKind);
     const credentials = await loadCredentials(db, run.connection_id, run.provider, masterKey);
     const status = await adapter.getRunStatus(credentials, run.provider_run_id!);
-    actualMicroUsd = status.usageTotalMicroUsd ?? 0;
+    if (status.usageTotalMicroUsd !== undefined) {
+      actualMicroUsd = status.usageTotalMicroUsd;
+      providerReported = true;
+    }
   } catch (error) {
     log.warn('Could not fetch provider usage; storing zero and flagging', {
       runId: run.id,
@@ -34,16 +38,34 @@ export async function handleReconcile(db: Db, job: Job, masterKey: string): Prom
     });
   }
 
+  // Providers with flat deterministic pricing (Outscraper) report no per-run
+  // billing — reconcile from the run's versioned rate card instead.
+  let rateCardDerived = false;
+  if (!providerReported && run.rate_card_id && run.ingested_count > 0) {
+    const { rows } = await db.query(
+      `select events from public.provider_rate_cards where id = $1`,
+      [run.rate_card_id],
+    );
+    const events = (rows[0]?.events ?? {}) as Record<string, number>;
+    const perPlace = Number(events.place_scraped ?? 0);
+    if (perPlace > 0) {
+      actualMicroUsd = Math.round(run.ingested_count * perPlace);
+      rateCardDerived = true;
+    }
+  }
+
   const estimated = Number(run.estimate_expected_micro_usd ?? 0);
   const variance = actualMicroUsd - estimated;
   const explanation =
-    actualMicroUsd === 0 && run.provider !== 'fixture'
+    actualMicroUsd === 0 && run.provider !== 'fixture' && !rateCardDerived
       ? 'Provider usage unavailable at reconciliation time.'
-      : variance === 0
-        ? 'Actual cost matched the expected estimate.'
-        : variance < 0
-          ? 'Actual cost below estimate: fewer places or successful enrichments than assumed.'
-          : 'Actual cost above expected estimate (within the approved hard cap): more successful enrichments than assumed.';
+      : rateCardDerived
+        ? `Computed from the rate card: ${run.ingested_count} places at the flat per-place rate (provider does not report per-run billing).`
+        : variance === 0
+          ? 'Actual cost matched the expected estimate.'
+          : variance < 0
+            ? 'Actual cost below estimate: fewer billable places, filters, or enrichments than assumed.'
+            : 'Actual cost above expected estimate (within the approved hard cap): more billable events than assumed.';
 
   await db.query(
     `insert into public.cost_ledger

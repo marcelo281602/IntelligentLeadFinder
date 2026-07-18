@@ -99,3 +99,12 @@ Update this file whenever a durable decision is made.
 
 ## Outscraper API (verified from python SDK, 2026-07-18)
 | Base `https://api.app.outscraper.com`; auth header `X-API-KEY`. Google Maps: `POST /google-maps-search` JSON `{query:[...], language, region, organizationsPerQueryLimit:limit, skipPlaces:skip, coordinates, dropDuplicates, async:true, enrichment:[], fields}`. Async → response has request `id`; poll `GET /requests/{id}` until `status != 'Pending'` (Success/Finished), results in `data` (array-per-query). No server-side $ cap → enforce cost via `limit` (flat per-place pricing is deterministic, safer than Apify outcome-based). Connection test: `GET /requests/<dummy>` (401=bad key, 404=ok, no scrape cost). |
+
+## 2026-07-18 (Outscraper adapter LIVE — second Google Maps source)
+| Decision |
+| --- |
+| `packages/providers/src/outscraper/` (schemas/client/adapter) implements the full `MapsProviderAdapter` contract. Key in `X-API-KEY` header only (never URL). `startRun` refuses without a positive hard cap; cost bounded by `organizationsPerQueryLimit` (flat $3/1k, deterministic). `validateKey` = GET /requests/<dummy> (401 bad key, 404 authenticated) — free connection test. No abort endpoint (no-op; pipeline settles local state). 12 contract tests in `outscraper-contract.test.ts`. |
+| Rate card lookup generalized: `rateCardKeyFor(provider, config)` in `apps/web/src/lib/estimate.ts` — Apify → actorId+planTier, Outscraper → fixed `google-maps`/`pay_as_you_go` (card seeded in 0007). Both `search.ts` and lead-finder page use it; lead-finder dropdown now includes outscraper connections. |
+| Reconcile fallback for providers that report no per-run billing: when `usageTotalMicroUsd` undefined, cost = `ingested_count × rate_card.events.place_scraped` from the run's versioned `rate_card_id` (honest explanation stored). Also fixed the cosmetic "more successful enrichments" wording → "more billable events". |
+| `connectOutscraper` action mirrors Apify (test-before-store, envelope encrypt, deny-all secret table, audit) + double-gates on the global `provider_outscraper` flag. Migration 0011 flips that flag (column is `metadata`, not `payload`). Integrations page: full Outscraper connect/rotate/disconnect card; planned-provider grid now Prospeo + Apollo only. |
+| Positioning: Outscraper = cheap volume company data ($3/1k vs Apify $4/1k free tier, and no outcome-based add-on charges); Apify = richer data + Business Leads enrichment. Clients can connect both and pick per-run. |

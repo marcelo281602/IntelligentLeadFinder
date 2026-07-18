@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { RateCard } from '@leadfinder/core';
 import { requirePermission } from '@/lib/auth';
-import { getBudgetStatus, loadRateCard } from '@/lib/estimate';
+import { getBudgetStatus, loadRateCard, rateCardKeyFor } from '@/lib/estimate';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { SearchBuilder } from '@/components/search-builder';
 import { Badge, Card, EmptyState, RunStatusBadge } from '@/components/ui';
@@ -33,7 +33,7 @@ export default async function LeadFinderPage({
         .eq('organization_id', ctx.orgId)
         .eq('status', 'connected')
         .is('deleted_at', null)
-        .in('provider', ['apify', 'fixture']),
+        .in('provider', ['apify', 'outscraper', 'fixture']),
       getBudgetStatus(ctx.orgId),
       supabase.from('organizations').select('default_country_code').eq('id', ctx.orgId).single(),
       supabase
@@ -59,17 +59,14 @@ export default async function LeadFinderPage({
   }> = [];
   for (const conn of connections ?? []) {
     const config = (conn.config ?? {}) as { actorId?: string; planTier?: string };
+    const key = rateCardKeyFor(conn.provider, config);
     try {
-      const { card } = await loadRateCard(
-        conn.provider,
-        config.actorId ?? 'compass/crawler-google-places',
-        config.planTier ?? 'starter',
-      );
+      const { card } = await loadRateCard(conn.provider, key.scope, key.planTier);
       connectionOptions.push({
         id: conn.id,
         provider: conn.provider,
         label: conn.label,
-        planTier: config.planTier ?? (conn.provider === 'fixture' ? 'free' : 'starter'),
+        planTier: conn.provider === 'fixture' ? 'free' : key.planTier,
         rateCard: card,
       });
     } catch {

@@ -8,21 +8,6 @@ import { ProviderError, type CapabilityManifest } from './types';
  * commercial-use approval row.
  */
 
-export function outscraperCapabilities(): CapabilityManifest {
-  return {
-    provider: 'outscraper',
-    companyCollection: false,
-    companyContactEnrichment: false,
-    decisionMakerDiscovery: false,
-    emailVerification: false,
-    phoneEnrichment: false,
-    notes: [
-      'Adapter not yet implemented — planned as a lower-cost Google Maps source',
-      'Feature flag provider_outscraper is off until contract-tested',
-    ],
-  };
-}
-
 export function prospeoCapabilities(): CapabilityManifest {
   return {
     provider: 'prospeo',

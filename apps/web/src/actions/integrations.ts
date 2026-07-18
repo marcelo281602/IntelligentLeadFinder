@@ -113,6 +113,109 @@ export async function connectApify(formData: FormData): Promise<void> {
   redirect('/integrations?connected=1');
 }
 
+const connectOutscraperSchema = z.object({
+  label: z.string().trim().min(1).max(100).default('Default'),
+  token: z.string().trim().min(10, 'Enter the API key').max(500),
+});
+
+export async function connectOutscraper(formData: FormData): Promise<void> {
+  const ctx = await requirePermission('integrations:manage');
+  enforceRateLimit(`connect:${ctx.userId}`, 10, 300_000);
+
+  const parsed = connectOutscraperSchema.safeParse({
+    label: formData.get('label') || 'Default',
+    token: formData.get('token'),
+  });
+  if (!parsed.success) {
+    redirect(`/integrations?error=${encodeURIComponent(parsed.error.issues[0]!.message)}`);
+  }
+
+  const service = createServiceClient();
+
+  // Feature-flag gate (defense in depth — the connect card is also hidden).
+  const { data: flag } = await service
+    .from('feature_flags')
+    .select('enabled')
+    .eq('key', 'provider_outscraper')
+    .is('organization_id', null)
+    .maybeSingle();
+  if (!flag?.enabled) {
+    redirect(
+      `/integrations?error=${encodeURIComponent('Outscraper is not enabled for this deployment.')}`,
+    );
+  }
+
+  // 1. Test before storing — never persist a credential that does not work.
+  const adapter = getMapsAdapter('outscraper');
+  const test = await adapter.testConnection({ token: parsed.data.token });
+  if (!test.ok) {
+    redirect(
+      `/integrations?error=${encodeURIComponent(test.error ?? 'Outscraper rejected the API key.')}`,
+    );
+  }
+
+  // 2. Encrypt and store, scoped to the verified org.
+  const envelope = encryptSecret(parsed.data.token, process.env.APP_ENCRYPTION_KEY!);
+  const fingerprint = secretFingerprint(parsed.data.token);
+
+  const { data: connection, error: connError } = await service
+    .from('integration_connections')
+    .insert({
+      organization_id: ctx.orgId,
+      provider: 'outscraper',
+      label: parsed.data.label,
+      status: 'connected',
+      config: { planTier: 'pay_as_you_go' },
+      secret_fingerprint: fingerprint,
+      created_by: ctx.userId,
+      last_test_at: new Date().toISOString(),
+      last_test_ok: true,
+    })
+    .select('id')
+    .single();
+  if (connError || !connection) {
+    const message =
+      connError?.code === '23505'
+        ? 'A connection with that label already exists.'
+        : 'Could not save the connection.';
+    redirect(`/integrations?error=${encodeURIComponent(message)}`);
+  }
+
+  const { data: secret } = await service
+    .from('integration_secret_versions')
+    .insert({
+      organization_id: ctx.orgId,
+      connection_id: connection.id,
+      version: 1,
+      envelope,
+      created_by: ctx.userId,
+    })
+    .select('id')
+    .single();
+  await service
+    .from('integration_connections')
+    .update({ active_secret_version_id: secret!.id })
+    .eq('id', connection.id);
+  await service.from('integration_health_checks').insert({
+    organization_id: ctx.orgId,
+    connection_id: connection.id,
+    ok: true,
+    latency_ms: test.latencyMs,
+    detail: `Connected as ${test.accountLabel ?? 'Outscraper account'}`,
+  });
+
+  await audit({
+    orgId: ctx.orgId,
+    actorUserId: ctx.userId,
+    action: 'integration.connected',
+    entityKind: 'integration_connection',
+    entityId: connection.id,
+    details: { provider: 'outscraper', label: parsed.data.label },
+  });
+  revalidatePath('/integrations');
+  redirect('/integrations?connected=outscraper');
+}
+
 export async function testConnection(formData: FormData): Promise<void> {
   const ctx = await requirePermission('integrations:read');
   const connectionId = z.string().uuid().safeParse(formData.get('connectionId'));

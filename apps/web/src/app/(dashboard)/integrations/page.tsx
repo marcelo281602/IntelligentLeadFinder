@@ -1,11 +1,8 @@
 import { hasPermission } from '@leadfinder/core';
-import {
-  apolloCapabilities,
-  outscraperCapabilities,
-  prospeoCapabilities,
-} from '@leadfinder/providers';
+import { apolloCapabilities, prospeoCapabilities } from '@leadfinder/providers';
 import {
   connectApify,
+  connectOutscraper,
   disconnectConnection,
   rotateCredential,
   testConnection,
@@ -67,15 +64,11 @@ export default async function IntegrationsPage({
   const flagEnabled = (key: string) => (flags ?? []).find((f) => f.key === key)?.enabled ?? false;
   const apolloApproved = (approvals ?? []).some((a) => a.approved);
   const apifyConnections = (connections ?? []).filter((c) => c.provider === 'apify');
+  const outscraperConnections = (connections ?? []).filter((c) => c.provider === 'outscraper');
+  const outscraperEnabled = flagEnabled('provider_outscraper');
   const fixtureConnection = (connections ?? []).find((c) => c.provider === 'fixture');
 
   const gatedProviders = [
-    {
-      name: 'Outscraper',
-      category: 'Data source',
-      caps: outscraperCapabilities(),
-      flag: flagEnabled('provider_outscraper'),
-    },
     {
       name: 'Prospeo',
       category: 'Contact enrichment',
@@ -110,7 +103,7 @@ export default async function IntegrationsPage({
       ) : null}
       {params.connected ? (
         <p className="rounded-md bg-ok-soft px-4 py-3 text-sm text-ok">
-          Apify connected and verified.
+          {params.connected === 'outscraper' ? 'Outscraper' : 'Apify'} connected and verified.
         </p>
       ) : null}
       {params.rotated ? (
@@ -327,6 +320,161 @@ export default async function IntegrationsPage({
         </div>
       </Card>
 
+      {/* Outscraper */}
+      {outscraperEnabled ? (
+        <Card className="rise rise-2">
+          <CardHeader
+            overline="Google Maps business data — flat $3 per 1,000 places"
+            title="Outscraper"
+            action={
+              outscraperConnections.length > 0 ? (
+                <Badge tone="ok">Connected</Badge>
+              ) : (
+                <Badge tone="neutral">Not connected</Badge>
+              )
+            }
+          />
+          <div className="space-y-4 p-5">
+            {outscraperConnections.map((conn) => (
+              <div key={conn.id} className="rounded-md border border-line bg-raised p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium">
+                      {conn.label}
+                      <span className="ml-2 text-xs text-ink-faint">
+                        pay-as-you-go
+                        {conn.secret_fingerprint ? (
+                          <>
+                            {' '}
+                            · fp <code className="mono">{conn.secret_fingerprint}</code>
+                          </>
+                        ) : null}
+                      </span>
+                    </p>
+                    <p className="text-xs text-ink-faint">
+                      {conn.last_test_ok ? 'Healthy' : (conn.last_error ?? 'Untested')} · last
+                      tested {formatDateTime(conn.last_test_at)}
+                      {conn.last_used_at ? ` · last used ${formatDateTime(conn.last_used_at)}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      tone={
+                        conn.status === 'connected'
+                          ? 'ok'
+                          : conn.status === 'error'
+                            ? 'danger'
+                            : 'neutral'
+                      }
+                    >
+                      {conn.status}
+                    </Badge>
+                    <form action={testConnection}>
+                      <input type="hidden" name="connectionId" value={conn.id} />
+                      <Button variant="secondary" type="submit">
+                        Test connection
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+                {canManage && conn.status !== 'disconnected' ? (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-sm text-primary select-none">
+                      Rotate credential or disconnect
+                    </summary>
+                    <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                      <form
+                        action={rotateCredential}
+                        className="space-y-2 rounded-md border border-line p-3"
+                      >
+                        <input type="hidden" name="connectionId" value={conn.id} />
+                        <p className="text-sm font-medium">Rotate API key</p>
+                        <Input
+                          name="token"
+                          type="password"
+                          placeholder="New Outscraper API key"
+                          autoComplete="off"
+                          required
+                        />
+                        <Input
+                          name="confirmPassword"
+                          type="password"
+                          placeholder="Your account password"
+                          autoComplete="current-password"
+                          required
+                        />
+                        <Button variant="secondary" type="submit">
+                          Rotate
+                        </Button>
+                      </form>
+                      <form
+                        action={disconnectConnection}
+                        className="space-y-2 rounded-md border border-line p-3"
+                      >
+                        <input type="hidden" name="connectionId" value={conn.id} />
+                        <p className="text-sm font-medium">Disconnect</p>
+                        <p className="text-xs text-ink-faint">
+                          Revokes the stored credential. Run history and provenance are kept.
+                        </p>
+                        <Input
+                          name="confirmPassword"
+                          type="password"
+                          placeholder="Your account password"
+                          autoComplete="current-password"
+                          required
+                        />
+                        <Button variant="danger" type="submit">
+                          Disconnect
+                        </Button>
+                      </form>
+                    </div>
+                  </details>
+                ) : null}
+              </div>
+            ))}
+
+            {canManage ? (
+              <details open={outscraperConnections.length === 0}>
+                <summary className="cursor-pointer text-sm font-medium text-primary select-none">
+                  {outscraperConnections.length === 0
+                    ? 'Connect Outscraper'
+                    : 'Add another Outscraper connection'}
+                </summary>
+                <form action={connectOutscraper} className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="API key"
+                    htmlFor="outscraper-token"
+                    hint="Outscraper → Profile → API. Stored encrypted; never displayed again."
+                  >
+                    <Input
+                      id="outscraper-token"
+                      name="token"
+                      type="password"
+                      autoComplete="off"
+                      required
+                    />
+                  </Field>
+                  <Field label="Label" htmlFor="outscraper-label">
+                    <Input id="outscraper-label" name="label" defaultValue="Default" />
+                  </Field>
+                  <div className="sm:col-span-2">
+                    <Button type="submit">Test &amp; connect</Button>
+                  </div>
+                </form>
+              </details>
+            ) : (
+              <p className="text-xs text-ink-faint">
+                Only owners and admins can manage provider credentials.
+              </p>
+            )}
+            <p className="text-xs text-ink-faint">
+              Collects business data only — pair with Apify Business Leads for decision-maker
+              contacts. First 500 places each month are free on Outscraper&apos;s side.
+            </p>
+          </div>
+        </Card>
+      ) : null}
+
       {/* Fixture */}
       <Card className="rise rise-2">
         <CardHeader
@@ -353,7 +501,7 @@ export default async function IntegrationsPage({
       />
 
       <p className="overline">Planned providers</p>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {gatedProviders.map((provider, i) => (
           <Card key={provider.name} className={`rise rise-${Math.min(i + 2, 4)} p-5`}>
             <div className="flex items-center justify-between">
