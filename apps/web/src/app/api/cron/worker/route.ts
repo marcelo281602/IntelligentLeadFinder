@@ -16,7 +16,8 @@ import { constantTimeEquals } from '@leadfinder/security';
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// Hobby functions cap at ~10s; keep headroom. Pro can raise this to 60+.
+export const maxDuration = 10;
 
 // Reuse the pool across warm invocations.
 let pool: ReturnType<typeof createPool> | null = null;
@@ -40,11 +41,12 @@ export async function GET(request: NextRequest) {
   const startedAt = Date.now();
   try {
     await runMaintenance(pool);
-    // Leave headroom under maxDuration for the response.
+    // Bounded so the whole request finishes within the Hobby ~10s cap; big
+    // runs are checkpointed and simply resume on the next tick.
     const { processed } = await processQueueTick(pool, env, {
       workerId: `cron-${Math.random().toString(36).slice(2, 8)}`,
-      budgetMs: 45_000,
-      maxJobs: 200,
+      budgetMs: 8_000,
+      maxJobs: 40,
     });
     return NextResponse.json({ ok: true, processed, ms: Date.now() - startedAt });
   } catch (error) {

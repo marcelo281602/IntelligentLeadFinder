@@ -12,7 +12,8 @@
     "test": "vitest run",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
-    "connect:apify": "tsx scripts/connect-apify.ts"
+    "connect:apify": "tsx scripts/connect-apify.ts",
+    "cron:setup": "tsx scripts/setup-cron.ts"
   },
   "dependencies": {
     "@leadfinder/core": "*",
