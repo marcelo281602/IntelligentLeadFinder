@@ -1,7 +1,7 @@
-import { unlink } from 'node:fs/promises';
 import type { Db } from '../db';
 import { auditLog } from '../ledger';
 import { log } from '../logger';
+import { removeExport } from '../storage';
 
 /**
  * Retention sweep: raw provider payloads past their retention deadline are
@@ -21,11 +21,7 @@ export async function handleRetentionSweep(db: Db): Promise<void> {
      returning id, organization_id, file_path`,
   );
   for (const row of expired.rows) {
-    try {
-      if (row.file_path) await unlink(String(row.file_path));
-    } catch {
-      // File already gone — the DB status is authoritative.
-    }
+    if (row.file_path) await removeExport(String(row.file_path));
     await auditLog(db, {
       orgId: row.organization_id as string,
       action: 'export.purged',

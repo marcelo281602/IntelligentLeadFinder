@@ -1,11 +1,10 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
 import ExcelJS from 'exceljs';
 import { columnsForKind, escapeFormulaInjection, toCsv, type CsvColumn } from '@leadfinder/core';
 import type { Db } from '../db';
 import { one } from '../db';
 import { auditLog, notify, recordUsage } from '../ledger';
 import type { Job } from '../queue';
+import { uploadExport } from '../storage';
 
 /**
  * Background export generation (CSV/XLSX). Selection was authorized and
@@ -69,7 +68,7 @@ const CONTACT_SQL: Record<string, string> = {
   src_is_fixture: 't.is_fixture',
 };
 
-export async function handleGenerateExport(db: Db, job: Job, storageDir: string): Promise<void> {
+export async function handleGenerateExport(db: Db, job: Job): Promise<void> {
   const exp = await one<ExportRow>(db, `select * from public.exports where id = $1`, [
     job.export_id ?? (job.payload.exportId as string),
   ]);
@@ -115,21 +114,15 @@ export async function handleGenerateExport(db: Db, job: Job, storageDir: string)
     ).rows;
   }
 
-  const fileName = `${exp.id}.${exp.format}`;
-  // Absolute path: the web app's download route runs in a different process
-  // (and cwd), so the stored path must not depend on the worker's cwd.
-  const filePath = resolve(join(storageDir, exp.organization_id, fileName));
-  await mkdir(dirname(filePath), { recursive: true });
-
-  let bytes: number;
+  let body: Buffer;
+  let contentType: string;
   if (exp.format === 'csv') {
     const csvColumns: CsvColumn<Record<string, unknown>>[] = columns.map((c, i) => ({
       header: c.header,
       value: (row) => row[`col_${i}`] as never,
     }));
-    const csv = toCsv(rows, csvColumns);
-    await writeFile(filePath, csv, 'utf8');
-    bytes = Buffer.byteLength(csv, 'utf8');
+    body = Buffer.from(toCsv(rows, csvColumns), 'utf8');
+    contentType = 'text/csv; charset=utf-8';
   } else {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet(kind === 'companies' ? 'Companies' : 'Decision Makers');
@@ -145,10 +138,19 @@ export async function handleGenerateExport(db: Db, job: Job, storageDir: string)
         }),
       );
     }
-    const buffer = await workbook.xlsx.writeBuffer();
-    await writeFile(filePath, Buffer.from(buffer));
-    bytes = (buffer as ArrayBuffer).byteLength;
+    body = Buffer.from(await workbook.xlsx.writeBuffer());
+    contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   }
+
+  // Store in Supabase Storage (private bucket) — survives serverless and is
+  // served only via short-lived signed URLs. file_path holds the object path.
+  const stored = await uploadExport({
+    orgId: exp.organization_id,
+    exportId: exp.id,
+    format: exp.format,
+    body,
+    contentType,
+  });
 
   await db.query(
     `update public.exports set
@@ -156,7 +158,7 @@ export async function handleGenerateExport(db: Db, job: Job, storageDir: string)
        generated_at = now(), expires_at = now() + interval '24 hours',
        purge_after = now() + interval '7 days'
      where id = $1`,
-    [exp.id, rows.length, filePath, bytes],
+    [exp.id, rows.length, stored.path, stored.bytes],
   );
 
   await recordUsage(db, {

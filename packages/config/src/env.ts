@@ -27,6 +27,9 @@ const serverEnvSchema = z.object({
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
   EXPORT_STORAGE_DIR: z.string().default('.local-storage/exports'),
+  // Shared secret that gates the /api/cron/worker route. Vercel Cron sends it
+  // as `Authorization: Bearer <CRON_SECRET>` when this env var is set.
+  CRON_SECRET: z.string().min(16).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

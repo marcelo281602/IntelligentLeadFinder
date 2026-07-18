@@ -36,6 +36,8 @@ const nextConfig: NextConfig = {
     '@leadfinder/core',
     '@leadfinder/providers',
     '@leadfinder/security',
+    '@leadfinder/db',
+    '@leadfinder/worker',
   ],
   poweredByHeader: false,
   async headers() {

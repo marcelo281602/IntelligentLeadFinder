@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   '/invite',
   '/api/webhooks',
   '/api/health',
+  '/api/cron',
   '/manifest.webmanifest',
   '/sw.js',
   '/icons',

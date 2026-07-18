@@ -3,19 +3,14 @@ import { createPool } from '@leadfinder/db';
 import { randomUUID } from 'node:crypto';
 import type { Db } from './db';
 import { errorSummary, log } from './logger';
-import { claimJob, completeJob, enqueueJob, failJob, recoverStalledJobs, type Job } from './queue';
-import { handleGenerateExport } from './pipeline/export';
-import { handleIngest } from './pipeline/ingest';
-import { handleNormalize } from './pipeline/normalize';
-import { handleReconcile } from './pipeline/reconcile';
-import { handleRetentionSweep } from './pipeline/retention';
-import { handleRunSearch } from './pipeline/run-search';
-import { handleSyncDestination } from './pipeline/sync-destinations';
+import { processQueueTick, runMaintenance } from './engine';
 
 /**
- * LeadFinder worker: durable job processing over Postgres.
- * Safe to run multiple instances — claims use SKIP LOCKED, every stage is
- * idempotent and resumable, and stalled jobs are recovered by heartbeat.
+ * LeadFinder standalone worker: a long-running process that drains the job
+ * queue continuously. Optional — the same engine also runs serverless via the
+ * Vercel Cron route (`/api/cron/worker`). Safe to run multiple instances:
+ * claims use SKIP LOCKED, every stage is idempotent, stalled jobs recover by
+ * heartbeat.
  */
 
 const env = serverEnv();
@@ -29,77 +24,30 @@ const db: Db = pool;
 const workerId = `worker-${randomUUID().slice(0, 8)}`;
 let shuttingDown = false;
 
-async function dispatch(job: Job): Promise<void | 'done' | 'rescheduled'> {
-  switch (job.kind) {
-    case 'run_search':
-      return handleRunSearch(db, job, env.APP_ENCRYPTION_KEY);
-    case 'ingest_dataset':
-      // The return value matters: 'rescheduled' means the poll job was reset
-      // to pending with a delay and must NOT be marked succeeded.
-      return handleIngest(db, job, env.APP_ENCRYPTION_KEY);
-    case 'normalize_run':
-      return handleNormalize(db, job);
-    case 'reconcile_costs':
-      return handleReconcile(db, job, env.APP_ENCRYPTION_KEY);
-    case 'generate_export':
-      return handleGenerateExport(db, job, env.EXPORT_STORAGE_DIR);
-    case 'sync_destination':
-      return handleSyncDestination(db, job, env.APP_ENCRYPTION_KEY);
-    case 'retention_sweep':
-      return handleRetentionSweep(db);
-    case 'dedupe_run':
-    case 'enrich_run':
-    case 'test_connection':
-      log.warn('Job kind handled inline elsewhere; nothing to do', { jobKind: job.kind });
-      return;
-  }
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function workLoop(slot: number): Promise<void> {
   while (!shuttingDown) {
-    let job: Job | null = null;
     try {
-      job = await claimJob(db, `${workerId}#${slot}`);
+      const { processed } = await processQueueTick(db, env, {
+        workerId: `${workerId}#${slot}`,
+        budgetMs: 25_000,
+        maxJobs: 50,
+      });
+      if (processed === 0) await sleep(env.WORKER_POLL_INTERVAL_MS);
     } catch (error) {
-      log.error('Failed to claim job', { error: errorSummary(error) });
-    }
-    if (!job) {
+      log.error('Work loop error', { error: errorSummary(error) });
       await sleep(env.WORKER_POLL_INTERVAL_MS);
-      continue;
-    }
-    const ctx = { jobId: job.id, jobKind: job.kind, orgId: job.organization_id, runId: job.run_id };
-    log.info('Job claimed', ctx);
-    try {
-      const result = (await dispatch(job)) as unknown;
-      if (result !== 'rescheduled') {
-        await completeJob(db, job.id);
-        log.info('Job succeeded', ctx);
-      }
-    } catch (error) {
-      log.error('Job failed', { ...ctx, error: errorSummary(error) });
-      const outcome = await failJob(db, job, error);
-      if (outcome === 'dead_letter' && job.run_id && job.organization_id) {
-        await db.query(
-          `update public.search_runs set status = 'failed', error_summary = $2, completed_at = now()
-           where id = $1 and status not in ('completed','cancelled','failed')`,
-          [job.run_id, errorSummary(error)],
-        );
-      }
     }
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function maintenanceLoop(): Promise<void> {
   while (!shuttingDown) {
     try {
-      const recovered = await recoverStalledJobs(db);
-      if (recovered > 0) log.warn(`Recovered ${recovered} stalled job(s)`);
-      const hourKey = new Date().toISOString().slice(0, 13);
-      await enqueueJob(db, { kind: 'retention_sweep', idempotencyKey: `retention:${hourKey}` });
+      await runMaintenance(db);
     } catch (error) {
       log.error('Maintenance loop error', { error: errorSummary(error) });
     }

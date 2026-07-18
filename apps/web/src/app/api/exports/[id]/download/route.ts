@@ -1,16 +1,15 @@
-import { createReadStream, existsSync } from 'node:fs';
-import { stat } from 'node:fs/promises';
-import { Readable } from 'node:stream';
 import { NextResponse, type NextRequest } from 'next/server';
 import { verifySignedToken } from '@leadfinder/security';
 import { createServiceClient } from '@/lib/supabase/service';
 
 /**
- * Stream an export file against a short-lived signed token. The token is the
- * only credential — links die after 15 minutes and the export row's own
- * expiry is enforced too. Local-disk storage is the development mode;
- * production uses private object storage (docs/DEPLOYMENT.md).
+ * Redirect to a short-lived Supabase Storage signed URL for an export file.
+ * The token minted by /exports/[id]/link is the only credential; links die
+ * after 15 minutes and the export row's own expiry is enforced too. Files
+ * live in a private bucket and are never publicly listable.
  */
+export const runtime = 'nodejs';
+
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const token = request.nextUrl.searchParams.get('token') ?? '';
@@ -23,7 +22,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   const service = createServiceClient();
   const { data: exportRow } = await service
     .from('exports')
-    .select('id, organization_id, status, file_path, format, expires_at, config')
+    .select('id, organization_id, status, file_path, format, expires_at, config, download_count')
     .eq('id', id)
     .eq('organization_id', verification.payload.org)
     .maybeSingle();
@@ -33,14 +32,20 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   if (exportRow.expires_at && new Date(exportRow.expires_at) < new Date()) {
     return NextResponse.json({ error: 'Download window has expired.' }, { status: 410 });
   }
-  if (!existsSync(exportRow.file_path)) {
+
+  const kind = (exportRow.config as { kind?: string } | null)?.kind ?? 'export';
+  const fileName = `leadfinder-${kind}-${id.slice(0, 8)}.${exportRow.format}`;
+  const { data: signed, error } = await service.storage
+    .from('exports')
+    .createSignedUrl(exportRow.file_path, 60, { download: fileName });
+  if (error || !signed) {
     return NextResponse.json({ error: 'File was purged.' }, { status: 410 });
   }
 
   await service
     .from('exports')
     .update({
-      download_count: ((exportRow as { download_count?: number }).download_count ?? 0) + 1,
+      download_count: (exportRow.download_count ?? 0) + 1,
       last_downloaded_at: new Date().toISOString(),
     })
     .eq('id', id);
@@ -52,21 +57,5 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     entity_id: id,
   });
 
-  const kind = (exportRow.config as { kind?: string } | null)?.kind ?? 'export';
-  const fileName = `leadfinder-${kind}-${id.slice(0, 8)}.${exportRow.format}`;
-  const contentType =
-    exportRow.format === 'csv'
-      ? 'text/csv; charset=utf-8'
-      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  const { size } = await stat(exportRow.file_path);
-  const stream = Readable.toWeb(createReadStream(exportRow.file_path)) as ReadableStream;
-
-  return new NextResponse(stream, {
-    headers: {
-      'Content-Type': contentType,
-      'Content-Length': String(size),
-      'Content-Disposition': `attachment; filename="${fileName}"`,
-      'Cache-Control': 'no-store',
-    },
-  });
+  return NextResponse.redirect(signed.signedUrl);
 }
