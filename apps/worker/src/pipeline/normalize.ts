@@ -87,6 +87,20 @@ export async function handleNormalize(db: Db, job: Job): Promise<void> {
     await heartbeatJob(db, job.id);
   }
 
+  // Authoritative counts derived from actual source rows, so they stay correct
+  // even if this job was interrupted and resumed (imperative bump counters
+  // would double-count re-processed records as duplicates). accepted =
+  // distinct companies this run produced; enriched = distinct contacts.
+  await db.query(
+    `update public.search_runs sr set
+       accepted_count = (select count(distinct company_id) from public.company_sources where run_id = sr.id),
+       enriched_count = (select count(distinct contact_id) from public.contact_sources where run_id = sr.id),
+       duplicate_count = greatest(0, sr.ingested_count - sr.rejected_count
+         - (select count(distinct company_id) from public.company_sources where run_id = sr.id))
+     where sr.id = $1`,
+    [run.id],
+  );
+
   await transitionRun(db, run, 'deduplicating');
   await finishStage(db, run.id, 'normalizing', 'succeeded');
   // Deterministic dedupe already ran inline via key tables; the deduplicating
