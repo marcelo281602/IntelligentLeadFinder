@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { APPROVED_YELP_ACTOR_ID, hasPermission } from '@leadfinder/core';
-import { createYelpDraftAndEstimate } from '@/actions/yelp';
 import { requireOrg } from '@/lib/auth';
+import { getBudgetStatus, loadRateCard, rateCardKeyFor } from '@/lib/estimate';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { formatDateTime, formatMicroUsd } from '@/lib/format';
-import { Badge, Button, Card, CardHeader, EmptyState, Field, Input, RunStatusBadge, Select } from '@/components/ui';
+import { YelpSearchBuilder } from '@/components/yelp-search-builder';
+import { Badge, Card, EmptyState, RunStatusBadge } from '@/components/ui';
 
 export const metadata = { title: 'Yelp Leads Scraper' };
 
@@ -26,7 +27,7 @@ export default async function YelpLeadsPage({
   const canManage = hasPermission(ctx.role, 'integrations:manage', ctx.overrides);
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: flags }, { data: connections }, { data: org }, { data: policy }, { data: card }] =
+  const [{ data: flags }, { data: connections }, { data: org }, { data: policy }, budget] =
     await Promise.all([
       supabase
         .from('feature_flags')
@@ -47,15 +48,14 @@ export default async function YelpLeadsPage({
         .select('max_results_per_run')
         .eq('organization_id', ctx.orgId)
         .maybeSingle(),
-      supabase
-        .from('provider_rate_cards')
-        .select('events, last_verified_at, version')
-        .eq('provider', 'yelp_apify')
-        .eq('active', true)
-        .order('version', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+      getBudgetStatus(ctx.orgId),
     ]);
+
+  // Full versioned rate card for the live client-side estimate panel.
+  const yelpKey = rateCardKeyFor('yelp_apify', {});
+  const rateCard = await loadRateCard('yelp_apify', yelpKey.scope, yelpKey.planTier)
+    .then((r) => r.card)
+    .catch(() => null);
 
   const flagOn = (key: string) => (flags ?? []).find((f) => f.key === key)?.enabled ?? false;
   const featureOn = flagOn('provider_yelp_apify');
@@ -95,9 +95,6 @@ export default async function YelpLeadsPage({
       .limit(8),
   ]);
 
-  const perResultMicro = Number(
-    (card?.events as Record<string, number> | null)?.business_result ?? 2750,
-  );
   const maxAllowed = Math.min(policy?.max_results_per_run ?? 1000, 1000);
 
   return (
@@ -181,137 +178,24 @@ export default async function YelpLeadsPage({
             }
           />
         </Card>
+      ) : canRun && rateCard ? (
+        <YelpSearchBuilder
+          connectionId={connection.id}
+          connectionLabel={connection.label}
+          rateCard={rateCard}
+          maxResultsLimit={maxAllowed}
+          remainingBudgetMicroUsd={budget.remainingMicroUsd}
+          perRunCapMicroUsd={budget.perRunCapMicroUsd}
+          defaultCountry={org?.default_country_code ?? 'US'}
+          legalOn={legalOn}
+        />
       ) : (
-        <Card className="rise rise-1">
-          <CardHeader
-            overline={`Approved Actor ${APPROVED_YELP_ACTOR_ID} · ${formatMicroUsd(perResultMicro)} per business result · pricing verified ${card?.last_verified_at ?? '2026-07-18'}`}
-            title="New Yelp search"
-          />
-          {canRun ? (
-            <form action={createYelpDraftAndEstimate} className="grid gap-4 p-5 sm:grid-cols-2">
-              <input type="hidden" name="connectionId" value={connection.id} />
-              <Field
-                label="Industry or search term"
-                htmlFor="yelp-term"
-                hint='e.g. "plumber", "coffee shop", "wedding photographer"'
-              >
-                <Input id="yelp-term" name="searchTerm" required maxLength={200} />
-              </Field>
-              <Field label="Search name" htmlFor="yelp-name" hint="Defaults to the search term">
-                <Input id="yelp-name" name="name" maxLength={200} />
-              </Field>
-              <Field label="Country" htmlFor="yelp-country">
-                <Select
-                  id="yelp-country"
-                  name="countryCode"
-                  defaultValue={org?.default_country_code ?? 'US'}
-                >
-                  <option value="US">United States</option>
-                  <option value="CA">Canada</option>
-                  <option value="GB">United Kingdom</option>
-                  <option value="AU">Australia</option>
-                  <option value="IE">Ireland</option>
-                  <option value="NZ">New Zealand</option>
-                </Select>
-              </Field>
-              <Field label="City" htmlFor="yelp-city">
-                <Input id="yelp-city" name="city" maxLength={120} />
-              </Field>
-              <Field label="State / region" htmlFor="yelp-region">
-                <Input id="yelp-region" name="region" maxLength={120} />
-              </Field>
-              <Field label="Postal / ZIP code" htmlFor="yelp-postal">
-                <Input id="yelp-postal" name="postalCode" maxLength={20} />
-              </Field>
-              <Field
-                label="Maximum results"
-                htmlFor="yelp-max"
-                hint={`Caps the paid item count. Workspace limit: ${maxAllowed}`}
-              >
-                <Input
-                  id="yelp-max"
-                  name="maxResults"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  defaultValue={Math.min(100, maxAllowed)}
-                  required
-                />
-              </Field>
-              <div className="sm:col-span-2">
-                <details className="rounded-md border border-line bg-raised">
-                  <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-primary select-none">
-                    Advanced Yelp options
-                  </summary>
-                  <div className="space-y-3 border-t border-line px-4 py-3 text-sm">
-                    <label className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        name="fetchBusinessDetails"
-                        defaultChecked
-                        className="mt-0.5"
-                      />
-                      <span>
-                        Fetch full business details
-                        <span className="block text-xs text-ink-faint">
-                          Visits each profile for hours, website, and services. Recommended.
-                        </span>
-                      </span>
-                    </label>
-                    <label className="flex items-start gap-2">
-                      <input type="checkbox" name="scrapeReviews" className="mt-0.5" />
-                      <span>
-                        Collect reviews
-                        <span className="block text-xs text-ink-faint">
-                          Billed at {formatMicroUsd(Number((card?.events as Record<string, number> | null)?.review_detail ?? 1500))}{' '}
-                          per review. Off by default — adds cost and retention obligations.
-                        </span>
-                      </span>
-                    </label>
-                    <Field
-                      label="Max reviews per business"
-                      htmlFor="yelp-max-reviews"
-                      hint="Applies only when review collection is on"
-                    >
-                      <Input
-                        id="yelp-max-reviews"
-                        name="maxReviewsPerBusiness"
-                        type="number"
-                        min={1}
-                        max={100}
-                        defaultValue={10}
-                      />
-                    </Field>
-                    <label className="flex items-start gap-2 opacity-60">
-                      <input type="checkbox" disabled className="mt-0.5" />
-                      <span>
-                        Website contact-email enrichment
-                        <span className="block text-xs text-ink-faint">
-                          Disabled: the Actor&apos;s email-enrichment event has no published price,
-                          so it cannot be estimated honestly. Any future email found this way is a
-                          company contact email — never a decision-maker email.
-                        </span>
-                      </span>
-                    </label>
-                  </div>
-                </details>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-                <Button type="submit" disabled={!legalOn}>
-                  Estimate cost →
-                </Button>
-                <p className="text-xs text-ink-faint">
-                  Next step shows the low / expected / high estimate and requires a hard maximum
-                  cost before anything is paid.
-                  {!legalOn ? ' Disabled until the legal review gate is recorded.' : ''}
-                </p>
-              </div>
-            </form>
-          ) : (
-            <p className="p-5 text-sm text-ink-faint">
-              Your role can review Yelp results but cannot start paid searches.
-            </p>
-          )}
+        <Card>
+          <p className="p-5 text-sm text-ink-faint">
+            {rateCard
+              ? 'Your role can review Yelp results but cannot start paid searches.'
+              : 'No active Yelp rate card is published — an admin must publish one before runs.'}
+          </p>
         </Card>
       )}
 
