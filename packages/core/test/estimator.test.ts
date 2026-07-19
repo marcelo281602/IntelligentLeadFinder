@@ -108,6 +108,26 @@ describe('validateHardCap', () => {
     expect(result.ok).toBe(false);
   });
 
+  it('rejects a cap below the provider minimum (Apify $0.50 floor)', () => {
+    const result = validateHardCap({
+      requestedCapMicroUsd: usdToMicro(0.19),
+      estimate: { ...estimate, totalLow: usdToMicro(0.01) },
+      orgPerRunCapMicroUsd: null,
+      orgRemainingMonthlyBudgetMicroUsd: null,
+      providerMinimumCapMicroUsd: usdToMicro(0.5),
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain('$0.50');
+    const okResult = validateHardCap({
+      requestedCapMicroUsd: usdToMicro(0.5),
+      estimate: { ...estimate, totalLow: usdToMicro(0.01) },
+      orgPerRunCapMicroUsd: null,
+      orgRemainingMonthlyBudgetMicroUsd: null,
+      providerMinimumCapMicroUsd: usdToMicro(0.5),
+    });
+    expect(okResult.ok).toBe(true);
+  });
+
   it('rejects a cap above the remaining monthly budget', () => {
     const result = validateHardCap({
       requestedCapMicroUsd: usdToMicro(20),

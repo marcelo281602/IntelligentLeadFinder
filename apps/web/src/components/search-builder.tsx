@@ -67,7 +67,9 @@ export function SearchBuilder({
     const candidate = {
       name: name || searchTerm || 'Untitled search',
       searchTerm,
-      maxResults,
+      // Floor to 1 so a momentarily-empty field mid-typing doesn't blank the
+      // estimate; the input itself clamps to [1, limit] on blur.
+      maxResults: Math.max(1, maxResults),
       language: 'en',
       locations: [
         {
@@ -209,11 +211,16 @@ export function SearchBuilder({
             >
               <Input
                 id="sb-max"
-                type="number"
-                min={1}
-                max={maxResultsLimit}
-                value={maxResults}
-                onChange={(e) => setMaxResults(Math.max(1, Number(e.target.value) || 1))}
+                type="text"
+                inputMode="numeric"
+                value={maxResults === 0 ? '' : String(maxResults)}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '');
+                  setMaxResults(digits === '' ? 0 : Number(digits));
+                }}
+                onBlur={() =>
+                  setMaxResults((v) => Math.min(maxResultsLimit, Math.max(1, v || 1)))
+                }
                 className="money"
               />
             </Field>
@@ -223,16 +230,11 @@ export function SearchBuilder({
             <Field label="City" htmlFor="sb-city" hint="Optional">
               <Input id="sb-city" value={city} onChange={(e) => setCity(e.target.value)} />
             </Field>
-            <Field
-              label="Postal code"
-              htmlFor="sb-postal"
-              hint="Use with country only — not with city"
-            >
+            <Field label="Postal code" htmlFor="sb-postal" hint="Optional">
               <Input
                 id="sb-postal"
                 value={postalCode}
                 onChange={(e) => setPostalCode(e.target.value)}
-                disabled={Boolean(city)}
               />
             </Field>
           </div>

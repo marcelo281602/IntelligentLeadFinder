@@ -1,5 +1,5 @@
 import type { EstimatorAssumptions, RateCard } from './rate-cards';
-import { MICRO_USD_PER_USD, type MicroUsd } from './types';
+import { formatMicroUsd, MICRO_USD_PER_USD, type MicroUsd } from './types';
 
 /**
  * Provider-aware cost estimator (Module 4).
@@ -265,12 +265,15 @@ export function validateHardCap(params: {
   estimate: CostEstimate;
   orgPerRunCapMicroUsd: MicroUsd | null;
   orgRemainingMonthlyBudgetMicroUsd: MicroUsd | null;
+  /** Provider-enforced minimum charge per run (e.g. Apify's $0.50 floor). */
+  providerMinimumCapMicroUsd?: MicroUsd | null;
 }): { ok: true; capMicroUsd: MicroUsd } | { ok: false; reason: string } {
   const {
     requestedCapMicroUsd,
     estimate,
     orgPerRunCapMicroUsd,
     orgRemainingMonthlyBudgetMicroUsd,
+    providerMinimumCapMicroUsd,
   } = params;
   if (!Number.isInteger(requestedCapMicroUsd) || requestedCapMicroUsd <= 0) {
     return { ok: false, reason: 'Cap must be a positive amount.' };
@@ -279,6 +282,12 @@ export function validateHardCap(params: {
     return {
       ok: false,
       reason: 'Cap is below the low estimate — the run would be cut off immediately.',
+    };
+  }
+  if (providerMinimumCapMicroUsd != null && requestedCapMicroUsd < providerMinimumCapMicroUsd) {
+    return {
+      ok: false,
+      reason: `The provider requires a spending cap of at least ${formatMicroUsd(providerMinimumCapMicroUsd)} per run — it rejects anything lower.`,
     };
   }
   if (orgPerRunCapMicroUsd !== null && requestedCapMicroUsd > orgPerRunCapMicroUsd) {

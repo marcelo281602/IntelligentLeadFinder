@@ -191,8 +191,14 @@ export default async function RunDetailPage({
                 name="capUsd"
                 type="number"
                 step="0.01"
-                min={microToUsd(estimate.totalLow).toFixed(2)}
-                defaultValue={microToUsd(estimate.recommendedCapMicroUsd).toFixed(2)}
+                min={Math.max(
+                  microToUsd(estimate.totalLow),
+                  run.provider === 'apify' || run.provider === 'yelp_apify' ? 0.5 : 0,
+                ).toFixed(2)}
+                defaultValue={Math.max(
+                  microToUsd(estimate.recommendedCapMicroUsd),
+                  run.provider === 'apify' || run.provider === 'yelp_apify' ? 0.5 : 0,
+                ).toFixed(2)}
                 className="money text-lg"
                 required
               />
@@ -200,6 +206,9 @@ export default async function RunDetailPage({
                 Sent to the provider as an enforced spending limit (
                 <code className="mono">maxTotalChargeUsd</code>). The run stops when it is reached.
                 You can lower it; raising beyond workspace limits is blocked.
+                {run.provider === 'apify' || run.provider === 'yelp_apify'
+                  ? ' Apify requires at least $0.50 per run.'
+                  : ''}
               </p>
               <Button type="submit" className="w-full" disabled={!canRun}>
                 Confirm and start run

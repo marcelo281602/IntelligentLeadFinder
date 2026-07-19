@@ -231,9 +231,9 @@ export default async function YelpLeadsPage({
                 <Input
                   id="yelp-max"
                   name="maxResults"
-                  type="number"
-                  min={1}
-                  max={maxAllowed}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   defaultValue={Math.min(100, maxAllowed)}
                   required
                 />

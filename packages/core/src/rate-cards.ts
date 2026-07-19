@@ -105,6 +105,14 @@ const APIFY_GMAPS_PER_1000_USD: Record<ApifyPlanTier, Record<ApifyEventKey, numb
 
 export const DEFAULT_APIFY_ACTOR_ID = 'compass/crawler-google-places';
 
+/**
+ * Apify refuses Actor runs whose maxTotalChargeUsd is below $0.50
+ * ("Maximum cost per run is less than the allowed minimum of $0.50" —
+ * observed from the live API 2026-07-19). Confirmation must enforce this
+ * floor for every Apify-platform provider or the run can never start.
+ */
+export const APIFY_MIN_RUN_CAP_MICRO_USD: MicroUsd = usdToMicro(0.5);
+
 export function apifyGoogleMapsRateCard(planTier: ApifyPlanTier): RateCard {
   const per1000 = APIFY_GMAPS_PER_1000_USD[planTier];
   const events: Record<string, MicroUsd> = {};

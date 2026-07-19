@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import {
+  APIFY_MIN_RUN_CAP_MICRO_USD,
   canTransition,
   searchConfigSchema,
   validateHardCap,
@@ -213,6 +214,12 @@ export async function confirmRun(formData: FormData): Promise<void> {
     estimate: estimate as never,
     orgPerRunCapMicroUsd: budget.perRunCapMicroUsd,
     orgRemainingMonthlyBudgetMicroUsd: run.is_fixture ? null : budget.remainingMicroUsd,
+    // Apify refuses maxTotalChargeUsd below $0.50 — enforce the floor here so
+    // a run can never be confirmed into a state the provider will reject.
+    providerMinimumCapMicroUsd:
+      run.provider === 'apify' || run.provider === 'yelp_apify'
+        ? APIFY_MIN_RUN_CAP_MICRO_USD
+        : null,
   });
   if (!validation.ok) {
     redirect(`${back}?error=${encodeURIComponent(validation.reason)}`);
