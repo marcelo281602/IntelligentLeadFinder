@@ -142,3 +142,9 @@ Update this file whenever a durable decision is made.
 | --- |
 | `yelp_legal_approved` flipped TRUE in live DB — approval recorded in flag metadata (owner marcelo281602@gmail.com, 2026-07-19, owner verified the Actor works via Apify Store). Both Yelp gates now open: paid Yelp runs allowed. First real run doubles as the smoke test — keep it small (the estimator + $0.50-min cap + hard cap all enforce). |
 | New `yelp-search-builder.tsx` client component: same two-column layout + sticky "Cost preview" panel as the Lead Finder SearchBuilder, live `estimateYelpRunCost` per keystroke from the versioned rate card (passed from server via loadRateCard), budget/per-run-cap display, over-budget block, suggested cap floored at Apify's $0.50 minimum. Yelp page now renders it instead of the plain server form; posts to the same `createYelpDraftAndEstimate` (server stays authoritative). |
+
+## 2026-07-19 (Yelp smoke run: schema drift found & fixed; lead-source labels)
+| Decision |
+| --- |
+| First real Yelp run (ca16d888, 30 results, $0.0915 — deterministic billing matched the rate card exactly) revealed OUTPUT SCHEMA DRIFT: the Actor emits `isClaimed` as the STRING "Claimed"/"Unclaimed" (docs implied boolean) → zod parse failed → all 30 items rejected, accepted=0. Fix: isClaimed accepts string|boolean; `about` → description; `is_page_not_found` rows rejected; contract-test fixture replaced with REAL captured output. Reprocessed the run FREE from stored provider_raw_records: status reset to normalizing + fresh normalize job; raw-record retention + resumable pipeline made re-billing unnecessary. |
+| Lead-source separation shipped: Companies page gets an All/Google Maps/Yelp source filter + Source badge column (google_place_id vs yelp_business_id, merged shows "Maps + Yelp"); destination syncs now write "Yelp lead"/"Google Maps lead"/"Google Maps + Yelp lead" in the sheet's existing Source column (was hardcoded "leadfinder"). |
