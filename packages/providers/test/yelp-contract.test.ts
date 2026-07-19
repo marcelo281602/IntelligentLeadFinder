@@ -11,23 +11,30 @@ const config = searchConfigSchema.parse({
   locations: [{ countryCode: 'us', city: 'Austin', region: 'Texas', postalCode: '78704' }],
 });
 
-// Redacted fixture matching the Actor's verified output contract (2026-07-18).
+// Redacted fixture matching REAL Actor output captured from the live
+// 2026-07-19 smoke run: isClaimed is a STRING ("Claimed"), rating a string,
+// and rows carry about / businessOwnerName / is_page_not_found.
 const yelpFixture = {
-  title: "Angie's Restaurant",
-  yelp_biz_id: 'k0v1lBFP4vL8xQ2pXn3tZw',
   url: 'https://www.yelp.com/biz/angies-restaurant-logan',
-  rating: 4.2,
-  reviewCount: '509 reviews',
-  isClaimed: true,
+  city: 'Logan',
+  type: 'business',
+  about: 'Family diner since 1983.',
+  hours: { Mon: '7:00 AM - 9:00 PM' },
+  state: 'UT',
+  title: "Angie's Restaurant",
+  rating: '4.2',
+  status: 'SUCCEEDED',
+  website: 'http://www.angiesrest.com/',
+  zipcode: '84321',
+  isClaimed: 'Claimed',
   categories: 'Breakfast & Brunch,American',
   priceLevel: '$$',
-  phoneNumber: '(435) 752-9252',
-  website: 'http://www.angiesrest.com/',
   fullAddress: '690 N Main St, Logan, UT 84321',
-  city: 'Logan',
-  state: 'UT',
-  zipcode: '84321',
-  hours: { Mon: '7:00 AM - 9:00 PM' },
+  phoneNumber: '(435) 752-9252',
+  reviewCount: '509 reviews',
+  yelp_biz_id: 'k0v1lBFP4vL8xQ2pXn3tZw',
+  businessOwnerName: 'Angie D.',
+  is_page_not_found: false,
 };
 
 describe('buildYelpSearchUrl (server-side URL builder)', () => {
@@ -138,6 +145,12 @@ describe('mapYelpBusiness (response mapping)', () => {
   it('rejects rows without a business name', () => {
     expect(mapYelpBusiness({ city: 'Logan' })).toBeNull();
     expect(mapYelpBusiness(null)).toBeNull();
+  });
+
+  it('rejects dead Yelp pages and maps the about text as description', () => {
+    expect(mapYelpBusiness({ ...yelpFixture, is_page_not_found: true })).toBeNull();
+    const c = mapYelpBusiness(yelpFixture)!.company;
+    expect(c.description).toBe('Family diner since 1983.');
   });
 });
 

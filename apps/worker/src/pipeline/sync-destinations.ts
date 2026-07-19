@@ -134,7 +134,8 @@ export async function handleSyncDestination(db: Db, job: Job, masterKey: string)
   const { rows: companies } = await db.query(
     `select distinct c.id, c.canonical_name, c.primary_category, c.website, c.primary_email,
             c.primary_phone, c.company_linkedin_url, c.full_address, c.city, c.country_code,
-            c.rating, c.review_count, c.google_maps_url, c.google_place_id, c.created_at
+            c.rating, c.review_count, c.google_maps_url, c.google_place_id, c.yelp_business_id,
+            c.created_at
      from public.companies c
      ${runId ? 'join public.company_sources cs on cs.company_id = c.id' : ''}
      where c.organization_id = $2
@@ -188,8 +189,17 @@ export async function handleSyncDestination(db: Db, job: Job, masterKey: string)
       reviews:
         c.review_count !== null && c.review_count !== undefined ? Number(c.review_count) : null,
       mapsUrl: (c.google_maps_url as string) ?? null,
-      placeId: (c.google_place_id as string) ?? null,
-      source: 'leadfinder',
+      placeId: ((c.google_place_id as string) ?? (c.yelp_business_id as string)) ?? null,
+      // Source column in the client's sheet: which lead source produced this
+      // record (a merged record found on both says so).
+      source:
+        c.google_place_id && c.yelp_business_id
+          ? 'Google Maps + Yelp lead'
+          : c.yelp_business_id
+            ? 'Yelp lead'
+            : c.google_place_id
+              ? 'Google Maps lead'
+              : 'LeadFinder',
       contactName: (contact?.full_name as string) ?? null,
       contactTitle: (contact?.job_title as string) ?? null,
       contactWorkEmail: (contact?.work_email as string) ?? null,

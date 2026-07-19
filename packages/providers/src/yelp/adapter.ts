@@ -58,6 +58,9 @@ export function mapYelpBusiness(raw: unknown, context?: MapContext): MapResult |
   if (!parsed.success) return null;
   const item: YelpBusiness = parsed.data;
 
+  // Dead Yelp pages carry no real business data — reject, never store.
+  if (item.is_page_not_found === true || item.is_page_not_found === 'true') return null;
+
   const categories = item.categories
     ? item.categories.split(',').map((c) => c.trim()).filter(Boolean)
     : [];
@@ -80,7 +83,7 @@ export function mapYelpBusiness(raw: unknown, context?: MapContext): MapResult |
     subtitle: null,
     primaryCategory: categories[0] ?? null,
     categories,
-    description: null,
+    description: item.about?.trim() ? item.about.trim() : null,
     website: item.website ?? null,
     // A contact email discovered from the business website is a COMPANY
     // contact email — never a Yelp-provided or decision-maker email.

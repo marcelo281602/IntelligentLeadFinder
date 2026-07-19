@@ -22,7 +22,12 @@ export interface YelpActorInput {
   enrichEmails: false;
 }
 
-/** One business row as emitted by the Actor (all optional except the name). */
+/**
+ * One business row as emitted by the Actor (all optional except the name).
+ * Re-validated against REAL output from the 2026-07-19 smoke run: isClaimed
+ * arrives as the string "Claimed"/"Unclaimed" (not a boolean), rating as a
+ * string ("5"), and rows also carry about/businessOwnerName/is_page_not_found.
+ */
 export const yelpBusinessSchema = z
   .object({
     title: z.string().min(1),
@@ -30,7 +35,7 @@ export const yelpBusinessSchema = z
     url: z.string().nullish(),
     rating: z.union([z.number(), z.string()]).nullish(),
     reviewCount: z.union([z.number(), z.string()]).nullish(),
-    isClaimed: z.boolean().nullish(),
+    isClaimed: z.union([z.boolean(), z.string()]).nullish(),
     categories: z.string().nullish(),
     priceLevel: z.string().nullish(),
     phoneNumber: z.string().nullish(),
@@ -40,6 +45,10 @@ export const yelpBusinessSchema = z
     state: z.string().nullish(),
     zipcode: z.union([z.string(), z.number()]).nullish(),
     hours: z.unknown().nullish(),
+    /** Business "about" text shown on the profile. */
+    about: z.string().nullish(),
+    /** Dead Yelp page marker — such rows are rejected, never stored. */
+    is_page_not_found: z.union([z.boolean(), z.string()]).nullish(),
     /** Present only when email enrichment ran — always a COMPANY email. */
     contactEmail: z.string().nullish(),
   })

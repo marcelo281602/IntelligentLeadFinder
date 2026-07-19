@@ -26,6 +26,7 @@ export default async function CompaniesPage({
     page?: string;
     q?: string;
     status?: string;
+    source?: string;
     sort?: string;
     error?: string;
   }>;
@@ -49,13 +50,16 @@ export default async function CompaniesPage({
   let query = supabase
     .from('companies')
     .select(
-      'id, canonical_name, primary_category, city, country_code, rating, review_count, website, primary_email, primary_phone, company_linkedin_url, lead_status, is_fixture, updated_at, contacts(count)',
+      'id, canonical_name, primary_category, city, country_code, rating, review_count, website, primary_email, primary_phone, company_linkedin_url, lead_status, is_fixture, updated_at, google_place_id, yelp_business_id, contacts(count)',
       { count: 'exact' },
     )
     .eq('organization_id', ctx.orgId)
     .is('deleted_at', null);
   if (q) query = query.ilike('canonical_name', `%${q}%`);
   if (params.status) query = query.eq('lead_status', params.status);
+  // Lead-source filter: which provider namespace the record came from.
+  if (params.source === 'google') query = query.not('google_place_id', 'is', null);
+  if (params.source === 'yelp') query = query.not('yelp_business_id', 'is', null);
 
   const { data: companies, count } = await query
     .order(sort.column, { ascending: sort.ascending, nullsFirst: false })
@@ -98,6 +102,16 @@ export default async function CompaniesPage({
                 {s.replaceAll('_', ' ')}
               </option>
             ))}
+          </Select>
+          <Select
+            name="source"
+            defaultValue={params.source ?? ''}
+            aria-label="Filter by lead source"
+            className="w-44"
+          >
+            <option value="">All sources</option>
+            <option value="google">Google Maps leads</option>
+            <option value="yelp">Yelp leads</option>
           </Select>
           <Select name="sort" defaultValue={sortKey} aria-label="Sort companies" className="w-44">
             {Object.entries(SORTS).map(([key, s]) => (
@@ -147,6 +161,7 @@ export default async function CompaniesPage({
                   </Th>
                   <Th>Company</Th>
                   <Th>Category</Th>
+                  <Th>Source</Th>
                   <Th>Location</Th>
                   <Th className="text-right">Rating</Th>
                   <Th>Company email</Th>
@@ -187,6 +202,17 @@ export default async function CompaniesPage({
                       ) : null}
                     </Td>
                     <Td className="text-ink-soft">{company.primary_category ?? '—'}</Td>
+                    <Td>
+                      {company.google_place_id && company.yelp_business_id ? (
+                        <Badge tone="accent">Maps + Yelp</Badge>
+                      ) : company.yelp_business_id ? (
+                        <Badge tone="accent">Yelp</Badge>
+                      ) : company.google_place_id ? (
+                        <Badge tone="neutral">Google Maps</Badge>
+                      ) : (
+                        <span className="text-xs text-ink-faint">—</span>
+                      )}
+                    </Td>
                     <Td className="text-ink-soft">
                       {[company.city, company.country_code].filter(Boolean).join(', ') || '—'}
                     </Td>
@@ -255,7 +281,7 @@ export default async function CompaniesPage({
           {page > 1 ? (
             <Link
               className="text-primary hover:underline"
-              href={`/companies?page=${page - 1}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(params.status ?? '')}&sort=${sortKey}`}
+              href={`/companies?page=${page - 1}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(params.status ?? '')}&source=${encodeURIComponent(params.source ?? '')}&sort=${sortKey}`}
             >
               ← Prev
             </Link>
@@ -266,7 +292,7 @@ export default async function CompaniesPage({
           {page < totalPages ? (
             <Link
               className="text-primary hover:underline"
-              href={`/companies?page=${page + 1}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(params.status ?? '')}&sort=${sortKey}`}
+              href={`/companies?page=${page + 1}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(params.status ?? '')}&source=${encodeURIComponent(params.source ?? '')}&sort=${sortKey}`}
             >
               Next →
             </Link>
