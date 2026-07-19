@@ -22,13 +22,29 @@ const PAGE_SIZE = 25;
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; q?: string; status?: string; error?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    q?: string;
+    status?: string;
+    sort?: string;
+    error?: string;
+  }>;
 }) {
   const ctx = await requireOrg();
   const params = await searchParams;
   const page = Math.max(1, Number(params.page ?? 1) || 1);
   const q = (params.q ?? '').trim();
   const supabase = await createSupabaseServerClient();
+
+  // Server-validated sort allowlist; anything else falls back to recency.
+  const SORTS: Record<string, { column: string; ascending: boolean; label: string }> = {
+    updated: { column: 'updated_at', ascending: false, label: 'Last updated' },
+    category: { column: 'primary_category', ascending: true, label: 'Category (A–Z)' },
+    name: { column: 'canonical_name', ascending: true, label: 'Name (A–Z)' },
+    rating: { column: 'rating', ascending: false, label: 'Rating (high first)' },
+  };
+  const sortKey = params.sort && params.sort in SORTS ? params.sort : 'updated';
+  const sort = SORTS[sortKey]!;
 
   let query = supabase
     .from('companies')
@@ -42,6 +58,7 @@ export default async function CompaniesPage({
   if (params.status) query = query.eq('lead_status', params.status);
 
   const { data: companies, count } = await query
+    .order(sort.column, { ascending: sort.ascending, nullsFirst: false })
     .order('updated_at', { ascending: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
@@ -82,8 +99,15 @@ export default async function CompaniesPage({
               </option>
             ))}
           </Select>
+          <Select name="sort" defaultValue={sortKey} aria-label="Sort companies" className="w-44">
+            {Object.entries(SORTS).map(([key, s]) => (
+              <option key={key} value={key}>
+                Sort: {s.label}
+              </option>
+            ))}
+          </Select>
           <Button variant="secondary" type="submit">
-            Filter
+            Apply
           </Button>
         </form>
       </div>
@@ -231,7 +255,7 @@ export default async function CompaniesPage({
           {page > 1 ? (
             <Link
               className="text-primary hover:underline"
-              href={`/companies?page=${page - 1}&q=${encodeURIComponent(q)}`}
+              href={`/companies?page=${page - 1}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(params.status ?? '')}&sort=${sortKey}`}
             >
               ← Prev
             </Link>
@@ -242,7 +266,7 @@ export default async function CompaniesPage({
           {page < totalPages ? (
             <Link
               className="text-primary hover:underline"
-              href={`/companies?page=${page + 1}&q=${encodeURIComponent(q)}`}
+              href={`/companies?page=${page + 1}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(params.status ?? '')}&sort=${sortKey}`}
             >
               Next →
             </Link>

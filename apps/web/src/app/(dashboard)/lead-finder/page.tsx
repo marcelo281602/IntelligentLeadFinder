@@ -5,7 +5,7 @@ import { getBudgetStatus, loadRateCard, rateCardKeyFor } from '@/lib/estimate';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { SearchBuilder } from '@/components/search-builder';
 import { Badge, Card, EmptyState, RunStatusBadge } from '@/components/ui';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatMicroUsd } from '@/lib/format';
 
 export const metadata = { title: 'Lead Finder' };
 
@@ -43,7 +43,7 @@ export default async function LeadFinderPage({
         .maybeSingle(),
       supabase
         .from('search_runs')
-        .select('id, status, config_snapshot, created_at, accepted_count')
+        .select('id, status, config_snapshot, created_at, accepted_count, actual_cost_micro_usd')
         .eq('organization_id', ctx.orgId)
         .neq('status', 'draft')
         .order('created_at', { ascending: false })
@@ -171,6 +171,11 @@ export default async function LeadFinderPage({
                     </span>
                     <span className="flex shrink-0 items-center gap-3 text-xs text-ink-faint">
                       {run.accepted_count > 0 ? `${run.accepted_count} companies` : null}
+                      {run.actual_cost_micro_usd !== null ? (
+                        <span className="mono text-ink-soft">
+                          {formatMicroUsd(Number(run.actual_cost_micro_usd))}
+                        </span>
+                      ) : null}
                       <RunStatusBadge status={run.status} />
                       {formatDateTime(run.created_at)}
                     </span>
