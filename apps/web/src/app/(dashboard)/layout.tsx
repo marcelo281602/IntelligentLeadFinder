@@ -5,6 +5,7 @@ import { signOut } from '@/actions/auth';
 import { listMyOrganizations, switchOrganization } from '@/actions/org';
 import { requireOrg } from '@/lib/auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { BrandMark } from '@/components/brand-mark';
 import { MobileNav, NavLinks } from '@/components/nav';
 import { InstallPwaButton } from '@/components/pwa';
 
@@ -42,8 +43,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-surface px-3 py-5 lg:flex">
         <Link
           href="/"
-          className="mb-6 block px-3 font-display text-lg font-bold tracking-tight text-primary"
+          className="mb-6 flex items-center gap-2.5 px-3 font-display text-lg font-bold tracking-tight text-primary"
         >
+          <BrandMark size={26} />
           {brand.name}
         </Link>
         <NavLinks showYelp={showYelp} />
