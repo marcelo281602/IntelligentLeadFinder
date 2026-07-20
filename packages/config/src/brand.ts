@@ -32,7 +32,7 @@ export interface BrandConfig {
 export const brand: BrandConfig = {
   name: 'LeadFinder',
   shortName: 'LeadFinder',
-  tagline: 'Lead intelligence and decision-maker discovery for growing teams',
+  tagline: 'Lead intelligence and decision-maker scraper for growing teams',
   legalName: 'LeadFinder (working brand)',
   supportEmail: 'support@example.com',
   emailFrom: 'LeadFinder <no-reply@example.com>',
